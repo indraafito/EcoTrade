@@ -142,7 +142,7 @@ const Home = () => {
       </div>
 
       {/* ================= GRID MENU ================= */}
-      <div className="px-6 mt-6 grid grid-cols-2 gap-4">
+      {/* <div className="px-6 mt-6 grid grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <Recycle className="w-7 h-7 text-primary mb-2" />
           <p className="font-semibold text-gray-700">Tukar Poin</p>
@@ -166,7 +166,7 @@ const Home = () => {
           <p className="font-semibold text-gray-700">Riwayat Penukaran</p>
           <p className="text-xs text-gray-500">Voucher & Uang</p>
         </div>
-      </div>
+      </div> */}
 
       {/* ================= STATISTIK BOTOL & KG ================= */}
       <div className="grid grid-cols-2 gap-4 mt-2">
