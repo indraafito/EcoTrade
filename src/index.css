@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 153 80% 98%;
+    --foreground: 158 64% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 158 64% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 158 64% 12%;
+
+    --primary: 146 99% 35%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 197 71% 73%;
+    --secondary-foreground: 158 64% 12%;
+
+    --muted: 153 30% 95%;
+    --muted-foreground: 158 20% 45%;
+
+    --accent: 43 96% 56%;
+    --accent-foreground: 158 64% 12%;
+
+    --success: 146 99% 35%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 43 96% 56%;
+    --warning-foreground: 158 64% 12%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 153 30% 88%;
+    --input: 153 30% 88%;
+    --ring: 146 99% 35%;
+
+    --radius: 0.75rem;
+
+    --gradient-eco: none;
+    --gradient-subtle: none;
+    --shadow-eco: 0 10px 30px -10px hsl(146 99% 35% / 0.3);
+    --shadow-glow: 0 0 40px hsl(146 99% 70% / 0.4);
+  }
+
+  .dark {
+    --background: 158 50% 8%;
+    --foreground: 153 80% 98%;
+
+    --card: 158 45% 12%;
+    --card-foreground: 153 80% 98%;
+
+    --popover: 158 45% 12%;
+    --popover-foreground: 153 80% 98%;
+
+    --primary: 146 99% 35%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 197 45% 35%;
+    --secondary-foreground: 153 80% 98%;
+
+    --muted: 158 35% 18%;
+    --muted-foreground: 153 30% 65%;
+
+    --accent: 43 96% 56%;
+    --accent-foreground: 158 64% 12%;
+
+    --success: 146 99% 35%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 43 96% 56%;
+    --warning-foreground: 158 64% 12%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 158 35% 18%;
+    --input: 158 35% 18%;
+    --ring: 146 99% 35%;
+
+    --gradient-eco: none;
+    --gradient-subtle: none;
+    --shadow-eco: 0 10px 30px -10px hsl(146 99% 35% / 0.4);
+    --shadow-glow: 0 0 40px hsl(146 99% 70% / 0.5);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
