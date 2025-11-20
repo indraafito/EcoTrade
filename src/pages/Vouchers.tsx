@@ -1,11 +1,23 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import BottomNav from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, Gift, Tag, UtensilsCrossed, Smartphone } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import {
+  Gift,
+  Tag,
+  UtensilsCrossed,
+  Smartphone
+} from "lucide-react";
 import { toast } from "sonner";
 
 interface Voucher {
@@ -18,7 +30,6 @@ interface Voucher {
 }
 
 const Vouchers = () => {
-  const navigate = useNavigate();
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [userPoints, setUserPoints] = useState(0);
@@ -141,21 +152,14 @@ const Vouchers = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-6">
+    <div className="min-h-screen bg-background pb-20">
+      {/* HEADER */}
       <div className="bg-primary p-6 rounded-b-3xl shadow-eco mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-white hover:bg-white/20 mb-4"
-          onClick={() => navigate("/profile")}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Kembali
-        </Button>
         <h1 className="text-2xl font-bold text-white mb-2">Tukar Voucher</h1>
         <p className="text-white/90">Poin Anda: {userPoints}</p>
       </div>
 
+      {/* VOUCHER LIST */}
       <div className="px-6 space-y-4">
         {vouchers.map((voucher) => {
           const Icon = getVoucherIcon(voucher.type);
@@ -164,9 +168,7 @@ const Vouchers = () => {
           return (
             <Card
               key={voucher.id}
-              className={`cursor-pointer hover:shadow-md transition-all ${
-                !canRedeem ? "opacity-60" : ""
-              }`}
+              className={`cursor-pointer hover:shadow-md transition-all ${!canRedeem ? "opacity-60" : ""}`}
               onClick={() => canRedeem && setSelectedVoucher(voucher)}
             >
               <CardContent className="p-4">
@@ -195,6 +197,7 @@ const Vouchers = () => {
         })}
       </div>
 
+      {/* REDEEM DIALOG */}
       <Dialog open={!!selectedVoucher} onOpenChange={() => setSelectedVoucher(null)}>
         <DialogContent>
           <DialogHeader>
@@ -235,6 +238,9 @@ const Vouchers = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* BOTTOM NAV */}
+      <BottomNav />
     </div>
   );
 };
