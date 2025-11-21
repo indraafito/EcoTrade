@@ -1,23 +1,21 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Recycle, TrendingUp, Gift, ChevronRight } from "lucide-react";
 
 const slides = [
   {
-    icon: Recycle,
+    icon: "cuate.png",
     title: "Welcome to EcoTrade",
     description: "Smart, Sustainable, and Profitable for a Greener Future!",
     color: "text-primary",
   },
   {
-    icon: TrendingUp,
+    icon: "amico.png",
     title: "EcoTrade Sell",
     description: "Sell Easily, Earn Effortlessly, and Save the Planet!",
     color: "text-success",
   },
   {
-    icon: Gift,
+    icon: "rafiki.png",
     title: "EcoTrade Impact",
     description: "Turn waste into value, join the green movement!",
     color: "text-accent",
@@ -25,7 +23,6 @@ const slides = [
 ];
 
 const Onboarding = () => {
-  const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const handleNext = () => {
@@ -33,27 +30,30 @@ const Onboarding = () => {
       setCurrentSlide(currentSlide + 1);
     } else {
       localStorage.setItem("hasSeenOnboarding", "true");
-      navigate("/auth");
+      console.log("Navigasi ke /auth");
     }
   };
 
   const handleSkip = () => {
     localStorage.setItem("hasSeenOnboarding", "true");
-    navigate("/auth");
+    console.log("Navigasi ke /auth");
   };
 
   const slide = slides[currentSlide];
-  const Icon = slide.icon;
 
   return (
     <div className="min-h-screen bg-gradient-subtle flex flex-col items-center justify-center px-6 py-10">
       <div className="flex-1 flex flex-col items-center justify-center max-w-2xl w-full">
         {/* Icon */}
-        <div
-          className={`w-24 h-24 md:w-28 md:h-28 rounded-full bg-card flex items-center justify-center shadow-eco mb-8 ${slide.color}`}
-        >
-          <Icon className="w-12 h-12 md:w-14 md:h-14" />
-        </div>
+        <img
+          src={slide.icon}
+          alt={slide.title}
+          className="w-32 h-32 md:w-40 md:h-40 object-contain mb-8"
+          onError={(e) => {
+            // cast the event target to HTMLImageElement before accessing style
+            (e.target as HTMLImageElement).style.display = "none";
+          }}
+        />
 
         {/* Title */}
         <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-3 text-center">
@@ -81,7 +81,7 @@ const Onboarding = () => {
       </div>
 
       {/* Buttons */}
-      <div className="w-full max-w-md p-6 space-y-3">
+      <div className="w-full max-w-md p-6 space-y-3 flex flex-col items-center">
         <Button
           onClick={handleNext}
           className="w-full h-11 md:h-12 text-base md:text-lg"
@@ -89,7 +89,6 @@ const Onboarding = () => {
         >
           {currentSlide === slides.length - 1 ? "Mulai" : "Lanjut"}
         </Button>
-
         {currentSlide < slides.length - 1 && (
           <Button
             onClick={handleSkip}
