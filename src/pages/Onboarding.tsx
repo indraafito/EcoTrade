@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 const slides = [
   {
@@ -24,19 +25,20 @@ const slides = [
 
 const Onboarding = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const navigate = useNavigate();
 
   const handleNext = () => {
     if (currentSlide < slides.length - 1) {
       setCurrentSlide(currentSlide + 1);
     } else {
       localStorage.setItem("hasSeenOnboarding", "true");
-      console.log("Navigasi ke /auth");
+      navigate("/auth");
     }
   };
 
   const handleSkip = () => {
     localStorage.setItem("hasSeenOnboarding", "true");
-    console.log("Navigasi ke /auth");
+    navigate("/auth");
   };
 
   const slide = slides[currentSlide];
