@@ -29,7 +29,7 @@ const Home = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [weeklyPoints, setWeeklyPoints] = useState(0); // poin minggu ini
+  const [weeklyPoints, setWeeklyPoints] = useState(0);
 
   useEffect(() => {
     checkAuth();
@@ -75,7 +75,6 @@ const Home = () => {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Ambil aktivitas terbaru
       const { data, error } = await supabase
         .from("activities")
         .select(`
@@ -87,21 +86,18 @@ const Home = () => {
         `)
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
-        .limit(20); // ambil 20 terakhir
+        .limit(20);
 
       if (error) throw error;
       const activitiesData = data || [];
       setActivities(activitiesData);
 
-      // Hitung poin minggu ini
       const now = new Date();
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(now.getDate() - 7);
 
       const pointsThisWeek = activitiesData
-        .filter(
-          (act) => new Date(act.created_at) >= sevenDaysAgo
-        )
+        .filter((act) => new Date(act.created_at) >= sevenDaysAgo)
         .reduce((sum, act) => sum + act.points_earned, 0);
 
       setWeeklyPoints(pointsThisWeek);
@@ -119,7 +115,7 @@ const Home = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F7F7] pb-28">
+    <div className="min-h-screen bg-background pb-28">
       {/* ================= HEADER ================= */}
       <div className="bg-primary px-6 pt-10 pb-24 rounded-b-[32px] shadow-lg">
         <div className="flex items-center gap-3">
@@ -135,62 +131,62 @@ const Home = () => {
 
       {/* ================= FLOATING POINT CARD ================= */}
       <div className="-mt-16 px-6">
-        <div className="bg-white rounded-3xl shadow-xl p-6">
+        <div className="bg-card rounded-3xl shadow-xl p-6 border border-border">
           <div className="flex justify-between items-center">
             <div>
-              <p className="text-xs text-gray-500 mb-1">Total Poin Anda</p>
+              <p className="text-xs text-muted-foreground mb-1">Total Poin Anda</p>
               <p className="text-4xl font-bold text-primary">
                 {profile?.points || 0}
               </p>
-              <p className="text-xs text-green-500 mt-1">
+              <p className="text-xs text-green-500 dark:text-green-400 mt-1">
                 +{weeklyPoints} poin minggu ini
               </p>
             </div>
 
-            <div className="w-16 h-16 rounded-full bg-gray-100" />
+            <div className="w-16 h-16 rounded-full bg-secondary" />
           </div>
 
-          <p className="text-center mt-4 text-sm font-medium text-gray-600">
+          <p className="text-center mt-4 text-sm font-medium text-muted-foreground">
             Yearly Legend
           </p>
         </div>
       </div>
 
       {/* ================= STATISTIK BOTOL & KG ================= */}
-      <div className="grid grid-cols-2 gap-4 mt-2">
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col items-center">
+      <div className="grid grid-cols-2 gap-4 px-6 mt-6">
+        <div className="bg-card rounded-2xl p-4 shadow-sm border border-border flex flex-col items-center">
           <Recycle className="w-7 h-7 text-[#1DBF73] mb-2" />
-          <p className="text-2xl font-bold text-gray-800">
+          <p className="text-2xl font-bold text-foreground">
             {profile?.total_bottles || 0}
           </p>
-          <p className="text-xs text-gray-500 text-center">Botol Dibuang</p>
+          <p className="text-xs text-muted-foreground text-center">Botol Dibuang</p>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col items-center">
+        <div className="bg-card rounded-2xl p-4 shadow-sm border border-border flex flex-col items-center">
           <Weight className="w-7 h-7 text-[#1DBF73] mb-2" />
-          <p className="text-2xl font-bold text-gray-800">
+          <p className="text-2xl font-bold text-foreground">
             {profile?.total_weight_kg || 0}
           </p>
-          <p className="text-xs text-gray-500 text-center">Kg Total</p>
+          <p className="text-xs text-muted-foreground text-center">Kg Total</p>
         </div>
       </div>
 
       {/* ================= AKTIVITAS TERBARU ================= */}
       <div className="px-6 mt-8">
-        <p className="text-lg font-semibold text-gray-800 mb-3">
+        <p className="text-lg font-semibold text-foreground mb-3">
           Aktivitas Terbaru
         </p>
 
         <div className="space-y-3">
           {activities.length === 0 ? (
-            <div className="bg-white p-4 rounded-xl text-center text-gray-500 shadow-sm">
+            <div className="bg-card p-4 rounded-xl text-center text-muted-foreground shadow-sm border border-border">
               Belum ada aktivitas
             </div>
           ) : (
             activities.map((activity) => (
               <div
                 key={activity.id}
-                className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100"
+                className="bg-card p-4 rounded-2xl shadow-sm border border-border"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -198,10 +194,10 @@ const Home = () => {
                       <Recycle className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-800">
+                      <p className="font-medium text-foreground">
                         {activity.bottles_count} botol
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         {activity.locations?.name || "Lokasi tidak diketahui"}
                       </p>
                     </div>
@@ -211,11 +207,9 @@ const Home = () => {
                     <p className="font-semibold text-primary">
                       +{activity.points_earned}
                     </p>
-                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="w-3 h-3" />
-                      {new Date(activity.created_at).toLocaleDateString(
-                        "id-ID"
-                      )}
+                      {new Date(activity.created_at).toLocaleDateString("id-ID")}
                     </div>
                   </div>
                 </div>
