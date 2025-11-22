@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import BottomNav from "@/components/BottomNav";
+import Loading from "@/components/Loading";
 import { Recycle, Trophy, Weight, Clock, TrendingUp, Leaf, Award } from "lucide-react";
 import { toast } from "sonner";
 
@@ -107,14 +108,7 @@ const Home = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#1DBF73]/5 via-background to-primary/5 flex items-center justify-center">
-        <div className="relative">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary" />
-          <Leaf className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-primary animate-pulse" />
-        </div>
-      </div>
-    );
+    return <Loading />;
   }
 
   return (
