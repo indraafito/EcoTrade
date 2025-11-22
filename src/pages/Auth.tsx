@@ -2,12 +2,14 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, X } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState("");
 
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
@@ -74,10 +76,16 @@ const Auth = () => {
 
       if (error) throw error;
 
-      toast.success("Akun berhasil dibuat! Silakan Sign in.");
-      setActiveTab("login");
-      setLoginEmail(signupEmail);
-      setLoginPassword(signupPassword);
+      // Simpan email dan tampilkan modal
+      setRegisteredEmail(signupEmail);
+      setShowEmailModal(true);
+      
+      // Reset form
+      setSignupEmail("");
+      setSignupUsername("");
+      setSignupPassword("");
+      setSignupConfirmPassword("");
+      setSignupFullName("");
     } catch (error) {
       toast.error(error.message || "Registrasi gagal");
     } finally {
@@ -99,6 +107,11 @@ const Auth = () => {
     } catch (error) {
       toast.error(error.message || "Google Sign in gagal");
     }
+  };
+
+  const handleCloseModal = () => {
+    setShowEmailModal(false);
+    setActiveTab("login");
   };
 
   return (
@@ -390,6 +403,55 @@ const Auth = () => {
           </form>
         )}
       </div>
+
+      {/* ===================== EMAIL VERIFICATION MODAL ===================== */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full relative animate-in fade-in zoom-in duration-200">
+            <button
+              onClick={handleCloseModal}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            <div className="text-center">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mail className="w-8 h-8 text-primary" />
+              </div>
+
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                Verifikasi Email Anda
+              </h3>
+
+              <p className="text-gray-600 mb-6">
+                Kami telah mengirimkan link verifikasi ke email:
+              </p>
+
+              <div className="bg-primary/5 rounded-lg p-3 mb-6">
+                <p className="text-primary font-semibold break-all">
+                  {registeredEmail}
+                </p>
+              </div>
+
+              <p className="text-sm text-gray-500 mb-6">
+                Silakan cek inbox atau folder spam Anda dan klik link verifikasi untuk mengaktifkan akun Anda.
+              </p>
+
+              <button
+                onClick={handleCloseModal}
+                className="w-full py-3 bg-primary text-white font-semibold rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                Mengerti
+              </button>
+
+              <p className="text-xs text-gray-400 mt-4">
+                Tidak menerima email? Cek folder spam atau hubungi support
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
