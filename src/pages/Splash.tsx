@@ -18,7 +18,7 @@ const Splash = () => {
 
     const navigateTimer = setTimeout(() => {
       const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
-      navigate(hasSeenOnboarding ? "/auth" : "/onboarding");
+      navigate(hasSeenOnboarding ? "/onboarding":"/auth");
     }, 2000);
 
     return () => {
