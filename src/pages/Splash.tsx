@@ -6,108 +6,64 @@ const Splash = () => {
   const [animationStage, setAnimationStage] = useState(0);
 
   useEffect(() => {
-    // Stage 1: Show loading oval (0-500ms)
-    const stage1 = setTimeout(() => setAnimationStage(1), 100);
-    
-    // Stage 2: Show icon only (500-1000ms)
-    const stage2 = setTimeout(() => setAnimationStage(2), 600);
-    
-    // Stage 3: Show icon smaller (1000-1500ms)
-    const stage3 = setTimeout(() => setAnimationStage(3), 1100);
-    
-    // Stage 4: Show icon with text (1500-2000ms)
-    const stage4 = setTimeout(() => setAnimationStage(4), 1600);
+    const timings = [
+      { stage: 1, delay: 300 },    // Icon fade in
+      { stage: 2, delay: 1000 },   // Icon + text appear
+      { stage: 3, delay: 2000 },   // Navigate
+    ];
 
-    // Navigate after animation
-    const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
+    const timeouts = timings.map(({ stage, delay }) =>
+      setTimeout(() => setAnimationStage(stage), delay)
+    );
+
     const navigateTimer = setTimeout(() => {
-      if (hasSeenOnboarding) {
-        navigate("/auth");
-      } else {
-        navigate("/onboarding");
-      }
-    }, 2500);
+      const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
+      navigate(hasSeenOnboarding ? "/auth" : "/onboarding");
+    }, 2000);
 
     return () => {
-      clearTimeout(stage1);
-      clearTimeout(stage2);
-      clearTimeout(stage3);
-      clearTimeout(stage4);
+      timeouts.forEach(clearTimeout);
       clearTimeout(navigateTimer);
     };
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Stage 1: Loading Oval */}
-      {animationStage === 0 && (
-        <div className="animate-pulse">
-          <div className="w-32 h-16 bg-primary rounded-full opacity-50" />
-        </div>
-      )}
+    <div className="min-h-screen bg-gradient-to-b from-primary to-primary/95 flex items-center justify-center p-6 overflow-hidden">
+      {/* Single Logo Container - Size & Position Changes */}
+      <div className={`flex items-center gap-4 transition-all duration-700 ease-out ${
+        animationStage === 0 
+          ? "opacity-0 scale-75" 
+          : animationStage === 1
+          ? "opacity-100 scale-100"
+          : "opacity-100 scale-100"
+      }`}>
+        {/* Icon - Scales down at stage 2 */}
+        <img 
+          src="/icon-w.png" 
+          alt="EcoTrade Icon" 
+          className={`object-contain drop-shadow-md flex-shrink-0 transition-all duration-700 ease-out ${
+            animationStage <= 1 ? "w-32 h-32" : "w-16 h-16"
+          }`}
+          onError={(e) => {
+            e.currentTarget.replaceWith(
+              Object.assign(document.createElement('div'), {
+                innerHTML: animationStage <= 1 
+                  ? '<div class="w-32 h-32 bg-white rounded-3xl flex items-center justify-center shadow-xl"><div class="text-6xl font-bold text-primary">e</div></div>'
+                  : '<div class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg"><div class="text-3xl font-bold text-primary">e</div></div>'
+              }).firstChild
+            );
+          }}
+        />
 
-      {/* Stage 2: Icon Only (Large) */}
-      {animationStage === 1 && (
-        <div className="animate-fade-in">
-          <img 
-            src="/icon-w.png" 
-            alt="EcoTrade Icon" 
-            className="w-32 h-32 object-contain animate-scale-in"
-            onError={(e) => {
-              // Fallback jika icon-w.png tidak ada
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.parentElement.innerHTML = `
-                <div class="w-32 h-32 bg-white rounded-3xl flex items-center justify-center shadow-xl">
-                  <div class="text-6xl font-bold text-primary">e</div>
-                </div>
-              `;
-            }}
-          />
-        </div>
-      )}
-
-      {/* Stage 3: Icon Only (Medium) */}
-      {animationStage === 2 && (
-        <div className="animate-fade-in">
-          <img 
-            src="/icon-w.png" 
-            alt="EcoTrade Icon" 
-            className="w-24 h-24 object-contain"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.parentElement.innerHTML = `
-                <div class="w-24 h-24 bg-white rounded-3xl flex items-center justify-center shadow-xl">
-                  <div class="text-5xl font-bold text-primary">e</div>
-                </div>
-              `;
-            }}
-          />
-        </div>
-      )}
-
-      {/* Stage 4: Icon + Text */}
-      {animationStage >= 3 && (
-        <div className="flex items-center gap-3 animate-fade-in">
-          <img 
-            src="/icon-w.png" 
-            alt="EcoTrade Icon" 
-            className="w-16 h-16 object-contain"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.parentElement.innerHTML = `
-                <div class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-xl mr-3">
-                  <div class="text-3xl font-bold text-primary">e</div>
-                </div>
-              `;
-            }}
-          />
-          <h1 className={`text-4xl font-bold text-white tracking-tight ${
-            animationStage === 4 ? 'animate-slide-in' : 'opacity-0'
-          }`}>
-            EcoTrade
-          </h1>
-        </div>
-      )}
+        {/* Text - Appears at stage 2 */}
+        <h1 className={`text-4xl font-bold text-white tracking-tight whitespace-nowrap transition-all duration-700 ease-out ${
+          animationStage >= 2
+            ? "opacity-100 translate-x-0"
+            : "opacity-0 -translate-x-4 pointer-events-none"
+        }`}>
+          EcoTrade
+        </h1>
+      </div>
     </div>
   );
 };

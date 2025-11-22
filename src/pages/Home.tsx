@@ -6,6 +6,7 @@ import { Recycle, Trophy, Weight, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 interface Profile {
+  username: string;
   full_name: string;
   points: number;
   rank: number;
@@ -28,6 +29,7 @@ const Home = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [weeklyPoints, setWeeklyPoints] = useState(0); // poin minggu ini
 
   useEffect(() => {
     checkAuth();
@@ -53,7 +55,7 @@ const Home = () => {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("full_name, points, rank, total_bottles, total_weight_kg")
+        .select("username, full_name, points, rank, total_bottles, total_weight_kg")
         .eq("user_id", user.id)
         .single();
 
@@ -73,23 +75,36 @@ const Home = () => {
       } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Ambil aktivitas terbaru
       const { data, error } = await supabase
         .from("activities")
-        .select(
-          `
+        .select(`
           id,
           bottles_count,
           points_earned,
           created_at,
           locations (name)
-        `
-        )
+        `)
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
-        .limit(5);
+        .limit(20); // ambil 20 terakhir
 
       if (error) throw error;
-      setActivities(data || []);
+      const activitiesData = data || [];
+      setActivities(activitiesData);
+
+      // Hitung poin minggu ini
+      const now = new Date();
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(now.getDate() - 7);
+
+      const pointsThisWeek = activitiesData
+        .filter(
+          (act) => new Date(act.created_at) >= sevenDaysAgo
+        )
+        .reduce((sum, act) => sum + act.points_earned, 0);
+
+      setWeeklyPoints(pointsThisWeek);
     } catch (error: any) {
       toast.error("Gagal memuat aktivitas");
     }
@@ -111,7 +126,7 @@ const Home = () => {
           <div className="w-12 h-12 rounded-full bg-white/40 backdrop-blur-sm" />
           <div>
             <p className="text-white text-lg font-semibold">
-              Hi, {profile?.full_name || "Pengguna"}!
+              Hi, {profile?.username || "Pengguna"}!
             </p>
             <p className="text-white/80 text-sm">Keep saving the planet!</p>
           </div>
@@ -128,7 +143,7 @@ const Home = () => {
                 {profile?.points || 0}
               </p>
               <p className="text-xs text-green-500 mt-1">
-                +150 poin minggu ini
+                +{weeklyPoints} poin minggu ini
               </p>
             </div>
 
@@ -140,33 +155,6 @@ const Home = () => {
           </p>
         </div>
       </div>
-
-      {/* ================= GRID MENU ================= */}
-      {/* <div className="px-6 mt-6 grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <Recycle className="w-7 h-7 text-primary mb-2" />
-          <p className="font-semibold text-gray-700">Tukar Poin</p>
-          <p className="text-xs text-gray-500">Voucher & Uang</p>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <Trophy className="w-7 h-7 text-primary mb-2" />
-          <p className="font-semibold text-gray-700">Leaderboard</p>
-          <p className="text-xs text-gray-500">Voucher & Uang</p>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <Recycle className="w-7 h-7 text-primary mb-2" />
-          <p className="font-semibold text-gray-700">Riwayat Setor</p>
-          <p className="text-xs text-gray-500">Voucher & Uang</p>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <Weight className="w-7 h-7 text-primary mb-2" />
-          <p className="font-semibold text-gray-700">Riwayat Penukaran</p>
-          <p className="text-xs text-gray-500">Voucher & Uang</p>
-        </div>
-      </div> */}
 
       {/* ================= STATISTIK BOTOL & KG ================= */}
       <div className="grid grid-cols-2 gap-4 mt-2">
