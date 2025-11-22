@@ -470,7 +470,7 @@ const LocationPage = () => {
 
           {/* Custom Zoom Controls */}
           <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-            <Button
+            {/* <Button
               size="icon"
               className="bg-card/95 backdrop-blur-xl hover:bg-card text-foreground shadow-lg w-10 h-10 rounded-xl border border-white/20"
               onClick={() => {
@@ -493,7 +493,7 @@ const LocationPage = () => {
               }}
             >
               <span className="text-lg font-bold">−</span>
-            </Button>
+            </Button> */}
           </div>
 
           {userPos && (

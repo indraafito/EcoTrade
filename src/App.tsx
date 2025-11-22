@@ -15,6 +15,7 @@ import Vouchers from "./pages/Vouchers";
 import AdminAuth from "./pages/AdminAuth";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
+import { DarkModeProvider } from "./components/DarkMode";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <DarkModeProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Splash />} />
@@ -39,6 +41,7 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
+      </DarkModeProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

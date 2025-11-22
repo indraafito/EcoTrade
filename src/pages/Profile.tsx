@@ -5,11 +5,33 @@ import { Button } from "@/components/ui/button";
 import Loading from "@/components/Loading";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useDarkMode } from "@/components/DarkMode";
 
-import { User, Lock, History, Gift, LogOut, Moon, Sun, Globe, Award, Trophy, MapPin, Package, Recycle } from "lucide-react";
+import {
+  User,
+  Lock,
+  History,
+  Gift,
+  LogOut,
+  Moon,
+  Sun,
+  Globe,
+  Award,
+  Trophy,
+  MapPin,
+  Recycle,
+} from "lucide-react";
 import { toast } from "sonner";
 
 interface Profile {
@@ -45,23 +67,19 @@ const ProfilePage = () => {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleDarkMode } = useDarkMode();
 
   useEffect(() => {
     fetchProfile();
     fetchRedemptions();
     fetchActivities();
-    
-    const darkMode = localStorage.getItem("darkMode") === "true";
-    setIsDark(darkMode);
-    if (darkMode) {
-      document.documentElement.classList.add("dark");
-    }
   }, []);
 
   const fetchProfile = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
@@ -81,7 +99,9 @@ const ProfilePage = () => {
 
   const fetchRedemptions = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
@@ -103,7 +123,9 @@ const ProfilePage = () => {
 
   const fetchActivities = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
@@ -146,22 +168,10 @@ const ProfilePage = () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
+
       toast.success("Logout berhasil");
     } catch (error: any) {
       toast.error("Gagal logout");
-    }
-  };
-
-  const toggleDarkMode = () => {
-    const newDarkMode = !isDark;
-    setIsDark(newDarkMode);
-    localStorage.setItem("darkMode", String(newDarkMode));
-    
-    if (newDarkMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
     }
   };
 
@@ -175,7 +185,7 @@ const ProfilePage = () => {
       <div className="relative bg-gradient-to-br from-primary via-[#17a865] to-[#1DBF73] px-6 pt-12 pb-28 overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/3 blur-2xl" />
-        
+
         <div className="relative z-10">
           <div className="flex items-center gap-4">
             <Avatar className="w-20 h-20 border-4 border-white/30 shadow-xl">
@@ -196,7 +206,7 @@ const ProfilePage = () => {
       <div className="-mt-20 px-6">
         <div className="bg-card/80 backdrop-blur-xl rounded-3xl shadow-2xl p-6 border border-white/20 dark:border-white/10 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
-          
+
           <div className="relative z-10">
             <div className="flex items-center justify-between">
               <div>
@@ -206,9 +216,7 @@ const ProfilePage = () => {
                     Total Poin
                   </p>
                 </div>
-                <p className="text-5xl font-black text-primary tracking-tight">
-                  {profile?.points || 0}
-                </p>
+                <p className="text-5xl font-black text-primary tracking-tight">{profile?.points || 0}</p>
               </div>
               <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-[#1DBF73] flex items-center justify-center shadow-lg">
                 <Award className="w-9 h-9 text-white" />
@@ -222,13 +230,22 @@ const ProfilePage = () => {
       <div className="px-6 mt-6">
         <Tabs defaultValue="vouchers" className="w-full">
           <TabsList className="grid w-full grid-cols-3 h-12 bg-card/80 backdrop-blur-sm rounded-2xl p-1">
-            <TabsTrigger value="vouchers" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white">
+            <TabsTrigger
+              value="vouchers"
+              className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"
+            >
               Voucher
             </TabsTrigger>
-            <TabsTrigger value="history" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white">
+            <TabsTrigger
+              value="history"
+              className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"
+            >
               Riwayat
             </TabsTrigger>
-            <TabsTrigger value="settings" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white">
+            <TabsTrigger
+              value="settings"
+              className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"
+            >
               Pengaturan
             </TabsTrigger>
           </TabsList>
@@ -260,7 +277,7 @@ const ProfilePage = () => {
                     <p className="text-xs text-muted-foreground">
                       {new Date(redemption.redeemed_at).toLocaleDateString("id-ID", {
                         day: "numeric",
-                        month: "short"
+                        month: "short",
                       })}
                     </p>
                   </div>
@@ -303,7 +320,7 @@ const ProfilePage = () => {
                       <p className="text-xs text-muted-foreground">
                         {new Date(activity.created_at).toLocaleDateString("id-ID", {
                           day: "numeric",
-                          month: "short"
+                          month: "short",
                         })}
                       </p>
                     </div>
@@ -330,9 +347,7 @@ const ProfilePage = () => {
               <DialogContent className="rounded-3xl">
                 <DialogHeader>
                   <DialogTitle>Ganti Password</DialogTitle>
-                  <DialogDescription>
-                    Masukkan password baru Anda
-                  </DialogDescription>
+                  <DialogDescription>Masukkan password baru Anda</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -348,7 +363,10 @@ const ProfilePage = () => {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button onClick={handleChangePassword} className="w-full h-12 rounded-xl font-semibold">
+                  <Button
+                    onClick={handleChangePassword}
+                    className="w-full h-12 rounded-xl font-semibold"
+                  >
                     Simpan Password
                   </Button>
                 </DialogFooter>
@@ -356,23 +374,29 @@ const ProfilePage = () => {
             </Dialog>
 
             {/* Dark Mode Toggle */}
-            <div 
+            <div
               className="bg-card/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-border/50 cursor-pointer hover:border-primary/50 transition-colors"
               onClick={toggleDarkMode}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    {isDark ? (
-                      <Sun className="w-5 h-5 text-primary" />
-                    ) : (
-                      <Moon className="w-5 h-5 text-primary" />
-                    )}
+                    {isDark ? <Sun className="w-5 h-5 text-primary" /> : <Moon className="w-5 h-5 text-primary" />}
                   </div>
-                  <span className="font-semibold text-foreground">Mode {isDark ? "Terang" : "Gelap"}</span>
+                  <span className="font-semibold text-foreground">
+                    Mode {isDark ? "Terang" : "Gelap"}
+                  </span>
                 </div>
-                <div className={`w-11 h-6 rounded-full transition-colors ${isDark ? "bg-primary" : "bg-border"}`}>
-                  <div className={`w-5 h-5 rounded-full bg-white transition-transform transform ${isDark ? "translate-x-5" : "translate-x-0.5"} mt-0.5`} />
+                <div
+                  className={`w-11 h-6 rounded-full transition-colors ${
+                    isDark ? "bg-primary" : "bg-border"
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white transition-transform transform ${
+                      isDark ? "translate-x-5" : "translate-x-0.5"
+                    } mt-0.5`}
+                  />
                 </div>
               </div>
             </div>
@@ -391,7 +415,7 @@ const ProfilePage = () => {
             </div>
 
             {/* Logout */}
-            <div 
+            <div
               className="bg-destructive/10 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-destructive/20 cursor-pointer hover:border-destructive/50 transition-colors"
               onClick={handleLogout}
             >
