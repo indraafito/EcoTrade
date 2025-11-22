@@ -4,20 +4,16 @@ import BottomNav from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import Loading from "@/components/Loading";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Gift,
-  Tag,
-  UtensilsCrossed,
-  Smartphone
-} from "lucide-react";
+import { Gift, Tag, UtensilsCrossed, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 
 interface Voucher {
@@ -43,7 +39,9 @@ const Vouchers = () => {
 
   const fetchUserPoints = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
@@ -82,7 +80,9 @@ const Vouchers = () => {
     setIsRedeeming(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("User tidak ditemukan");
 
       if (userPoints < selectedVoucher.points_required) {
@@ -144,11 +144,7 @@ const Vouchers = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-      </div>
-    );
+    return <Loading />;
   }
 
   return (
@@ -168,22 +164,35 @@ const Vouchers = () => {
           return (
             <Card
               key={voucher.id}
-              className={`cursor-pointer hover:shadow-md transition-all ${!canRedeem ? "opacity-60" : ""}`}
+              className={`cursor-pointer hover:shadow-md transition-all ${
+                !canRedeem ? "opacity-60" : ""
+              }`}
               onClick={() => canRedeem && setSelectedVoucher(voucher)}
             >
               <CardContent className="p-4">
                 <div className="flex gap-4">
-                  <div className={`w-16 h-16 rounded-xl ${getVoucherColor(voucher.type)} flex items-center justify-center shrink-0`}>
+                  <div
+                    className={`w-16 h-16 rounded-xl ${getVoucherColor(
+                      voucher.type
+                    )} flex items-center justify-center shrink-0`}
+                  >
                     <Icon className="w-8 h-8" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between mb-2">
-                      <h3 className="font-semibold text-foreground">{voucher.title}</h3>
-                      <Badge variant={canRedeem ? "default" : "secondary"} className="ml-2">
+                      <h3 className="font-semibold text-foreground">
+                        {voucher.title}
+                      </h3>
+                      <Badge
+                        variant={canRedeem ? "default" : "secondary"}
+                        className="ml-2"
+                      >
                         {voucher.points_required} pts
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">{voucher.description}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {voucher.description}
+                    </p>
                     {!canRedeem && (
                       <p className="text-xs text-destructive mt-2">
                         Butuh {voucher.points_required - userPoints} poin lagi
@@ -198,11 +207,16 @@ const Vouchers = () => {
       </div>
 
       {/* REDEEM DIALOG */}
-      <Dialog open={!!selectedVoucher} onOpenChange={() => setSelectedVoucher(null)}>
+      <Dialog
+        open={!!selectedVoucher}
+        onOpenChange={() => setSelectedVoucher(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{selectedVoucher?.title}</DialogTitle>
-            <DialogDescription>{selectedVoucher?.description}</DialogDescription>
+            <DialogDescription>
+              {selectedVoucher?.description}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -210,8 +224,12 @@ const Vouchers = () => {
               <CardContent className="p-4">
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Poin Diperlukan:</span>
-                    <span className="font-semibold">{selectedVoucher?.points_required}</span>
+                    <span className="text-muted-foreground">
+                      Poin Diperlukan:
+                    </span>
+                    <span className="font-semibold">
+                      {selectedVoucher?.points_required}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Poin Anda:</span>
@@ -229,7 +247,11 @@ const Vouchers = () => {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedVoucher(null)} disabled={isRedeeming}>
+            <Button
+              variant="outline"
+              onClick={() => setSelectedVoucher(null)}
+              disabled={isRedeeming}
+            >
               Batal
             </Button>
             <Button onClick={redeemVoucher} disabled={isRedeeming}>
