@@ -170,6 +170,7 @@ const ProfilePage = () => {
       if (error) throw error;
 
       toast.success("Logout berhasil");
+      navigate("/auth");
     } catch (error: any) {
       toast.error("Gagal logout");
     }
