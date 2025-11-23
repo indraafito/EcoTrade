@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useDarkMode } from "@/components/DarkMode";
 
 import {
@@ -32,6 +33,11 @@ import {
   Trophy,
   MapPin,
   Recycle,
+  Eye,
+  EyeOff,
+  Mail,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -61,20 +67,38 @@ interface Activity {
   } | null;
 }
 
+interface UserPasswordStatus {
+  user_id: string;
+  email: string;
+  has_password: boolean;
+  auth_provider: string;
+  is_google_user: boolean;
+}
+
 const ProfilePage = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [redemptions, setRedemptions] = useState<VoucherRedemption[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
   const { isDark, toggleDarkMode } = useDarkMode();
+
+  // Password states
+  const [userPasswordStatus, setUserPasswordStatus] = useState<UserPasswordStatus | null>(null);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     fetchProfile();
     fetchRedemptions();
     fetchActivities();
+    fetchUserPasswordStatus();
   }, []);
 
   const fetchProfile = async () => {
@@ -150,19 +174,150 @@ const ProfilePage = () => {
     }
   };
 
-  const handleChangePassword = async () => {
+  // ============================================
+  // FETCH USER PASSWORD STATUS
+  // ============================================
+  const fetchUserPasswordStatus = async () => {
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .rpc('get_user_password_status', { _user_id: user.id });
 
       if (error) throw error;
-
-      toast.success("Password berhasil diubah");
-      setShowPasswordDialog(false);
-      setNewPassword("");
+      
+      if (data && data.length > 0) {
+        setUserPasswordStatus(data[0]);
+      }
     } catch (error: any) {
+      console.error("Error fetching password status:", error);
+      // Fallback: assume email auth if RPC fails
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserPasswordStatus({
+          user_id: user.id,
+          email: user.email || "",
+          has_password: true,
+          auth_provider: "email",
+          is_google_user: false,
+        });
+      }
+    }
+  };
+
+  // ============================================
+  // HANDLE PASSWORD CHANGE
+  // ============================================
+  const handleChangePassword = async () => {
+    if (!userPasswordStatus) return;
+
+    // Validation
+    if (userPasswordStatus.has_password) {
+      if (!oldPassword) {
+        toast.error("Password lama harus diisi!");
+        return;
+      }
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      toast.error("Password baru minimal 6 karakter!");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("Password baru tidak cocok!");
+      return;
+    }
+
+    setIsPasswordLoading(true);
+
+    try {
+      if (userPasswordStatus.has_password) {
+        // ============================================
+        // FLOW A: USER NORMAL (HAS PASSWORD)
+        // ============================================
+        
+        // 1. Verify old password
+        const { error: verifyError } = await supabase.auth.signInWithPassword({
+          email: userPasswordStatus.email,
+          password: oldPassword,
+        });
+
+        if (verifyError) {
+          toast.error("Password lama salah!");
+          setIsPasswordLoading(false);
+          return;
+        }
+
+        // 2. Update password
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: newPassword,
+        });
+
+        if (updateError) throw updateError;
+
+        // 3. Log the change
+        await supabase.rpc('log_password_change', {
+          _user_id: userPasswordStatus.user_id,
+          _email: userPasswordStatus.email,
+          _change_type: 'password_changed',
+          _success: true
+        });
+
+        toast.success("Password berhasil diubah!");
+        
+      } else {
+        // ============================================
+        // FLOW B: GOOGLE USER (NO PASSWORD)
+        // ============================================
+        
+        // 1. Send reset password email
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+          userPasswordStatus.email,
+          {
+            redirectTo: `${window.location.origin}/reset-password`,
+          }
+        );
+
+        if (resetError) throw resetError;
+
+        // 2. Create reset log
+        const tokenHash = `${userPasswordStatus.user_id}_${Date.now()}`;
+        await supabase.rpc('create_password_reset_log', {
+          _user_id: userPasswordStatus.user_id,
+          _email: userPasswordStatus.email,
+          _token_hash: tokenHash
+        });
+
+        toast.success(
+          "Link reset password telah dikirim ke email Anda!",
+          { duration: 5000 }
+        );
+      }
+
+      // Reset form
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowPasswordDialog(false);
+      
+    } catch (error: any) {
+      console.error("Password change error:", error);
       toast.error(error.message || "Gagal mengubah password");
+      
+      // Log failed attempt
+      if (userPasswordStatus) {
+        await supabase.rpc('log_password_change', {
+          _user_id: userPasswordStatus.user_id,
+          _email: userPasswordStatus.email,
+          _change_type: 'password_change_failed',
+          _success: false,
+          _error_message: error.message
+        });
+      }
+    } finally {
+      setIsPasswordLoading(false);
     }
   };
 
@@ -335,7 +490,9 @@ const ProfilePage = () => {
 
           {/* SETTINGS TAB */}
           <TabsContent value="settings" className="space-y-3 mt-4">
-            {/* Change Password */}
+            {/* ============================================ */}
+            {/* CHANGE PASSWORD - UPDATED */}
+            {/* ============================================ */}
             <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
               <DialogTrigger asChild>
                 <div className="bg-card/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-border/50 cursor-pointer hover:border-primary/50 transition-colors">
@@ -343,34 +500,164 @@ const ProfilePage = () => {
                     <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                       <Lock className="w-5 h-5 text-primary" />
                     </div>
-                    <span className="font-semibold text-foreground">Ganti Password</span>
+                    <div className="flex-1">
+                      <span className="font-semibold text-foreground">
+                        {userPasswordStatus?.has_password ? "Ganti Password" : "Atur Password"}
+                      </span>
+                      {userPasswordStatus?.is_google_user && !userPasswordStatus?.has_password && (
+                        <p className="text-xs text-muted-foreground mt-0.5">Login via Google</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </DialogTrigger>
-              <DialogContent className="rounded-3xl">
+              <DialogContent className="rounded-3xl sm:max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Ganti Password</DialogTitle>
-                  <DialogDescription>Masukkan password baru Anda</DialogDescription>
+                  <DialogTitle>
+                    {userPasswordStatus?.has_password ? "Ganti Password" : "Atur Password"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {userPasswordStatus?.has_password
+                      ? "Masukkan password lama dan password baru Anda"
+                      : "Kami akan mengirim link reset password ke email Anda"}
+                  </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="new-password">Password Baru</Label>
-                    <Input
-                      id="new-password"
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="rounded-xl"
-                    />
-                  </div>
+
+                <div className="space-y-4 py-2">
+                  {userPasswordStatus?.has_password ? (
+                    <>
+                      {/* ============================================ */}
+                      {/* FLOW A: NORMAL USER FORM */}
+                      {/* ============================================ */}
+                      
+                      {/* Old Password */}
+                      <div className="space-y-2">
+                        <Label htmlFor="old-password">Password Lama</Label>
+                        <div className="relative">
+                          <Input
+                            id="old-password"
+                            type={showOldPassword ? "text" : "password"}
+                            value={oldPassword}
+                            onChange={(e) => setOldPassword(e.target.value)}
+                            placeholder="Masukkan password lama"
+                            className="pr-10 rounded-xl"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowOldPassword(!showOldPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showOldPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* New Password */}
+                      <div className="space-y-2">
+                        <Label htmlFor="new-password">Password Baru</Label>
+                        <div className="relative">
+                          <Input
+                            id="new-password"
+                            type={showNewPassword ? "text" : "password"}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Minimal 6 karakter"
+                            className="pr-10 rounded-xl"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showNewPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Confirm Password */}
+                      <div className="space-y-2">
+                        <Label htmlFor="confirm-password">Konfirmasi Password Baru</Label>
+                        <div className="relative">
+                          <Input
+                            id="confirm-password"
+                            type={showConfirmPassword ? "text" : "password"}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Ketik ulang password baru"
+                            className="pr-10 rounded-xl"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* ============================================ */}
+                      {/* FLOW B: GOOGLE USER INFO */}
+                      {/* ============================================ */}
+                      <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                        <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <AlertDescription className="text-blue-800 dark:text-blue-300">
+                          <div className="space-y-2">
+                            <p className="font-semibold">Link akan dikirim ke:</p>
+                            <p className="text-sm break-all">{userPasswordStatus?.email}</p>
+                            <p className="text-xs mt-2">
+                              Klik link dalam email untuk mengatur password baru Anda.
+                            </p>
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    </>
+                  )}
                 </div>
-                <DialogFooter>
+
+                <DialogFooter className="gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowPasswordDialog(false);
+                      setOldPassword("");
+                      setNewPassword("");
+                      setConfirmPassword("");
+                    }}
+                    disabled={isPasswordLoading}
+                    className="rounded-xl"
+                  >
+                    Batal
+                  </Button>
                   <Button
                     onClick={handleChangePassword}
-                    className="w-full h-12 rounded-xl font-semibold"
+                    disabled={isPasswordLoading}
+                    className="rounded-xl font-semibold"
                   >
-                    Simpan Password
+                    {isPasswordLoading ? (
+                      <span className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Memproses...
+                      </span>
+                    ) : userPasswordStatus?.has_password ? (
+                      "Ubah Password"
+                    ) : (
+                      "Kirim Link"
+                    )}
                   </Button>
                 </DialogFooter>
               </DialogContent>
