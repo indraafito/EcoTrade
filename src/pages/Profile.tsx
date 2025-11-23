@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import BottomNav from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ interface Activity {
 }
 
 const ProfilePage = () => {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [redemptions, setRedemptions] = useState<VoucherRedemption[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
