@@ -16,6 +16,7 @@ import AdminAuth from "./pages/AdminAuth";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import { DarkModeProvider } from "./components/DarkMode";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 
 const queryClient = new QueryClient();
 
@@ -39,7 +40,8 @@ const App = () => (
           <Route path="/admin" element={<AdminAuth />} />
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
           <Route path="*" element={<NotFound />} />
-        </Routes>
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+       </Routes>
       </BrowserRouter>
       </DarkModeProvider>
     </TooltipProvider>
