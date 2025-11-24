@@ -5,19 +5,19 @@ import ThemeToggle from "@/components/ThemeToggle";
 
 const slides = [
   {
-    icon: "cuate.png",
+    icon: "cuate.svg",
     title: "Welcome to EcoTrade",
     description: "Smart, Sustainable, and Profitable for a Greener Future!",
     color: "text-primary",
   },
   {
-    icon: "amico.png",
+    icon: "amico.svg",
     title: "EcoTrade Sell",
     description: "Sell Easily, Earn Effortlessly, and Save the Planet!",
     color: "text-success",
   },
   {
-    icon: "rafiki.png",
+    icon: "rafiki.svg",
     title: "EcoTrade Impact",
     description: "Turn waste into value, join the green movement!",
     color: "text-accent",
@@ -45,7 +45,7 @@ const Onboarding = () => {
   const slide = slides[currentSlide];
 
   return (
-    <div className="min-h-screen bg-gradient-subtle dark:bg-gray-900 flex flex-col items-center justify-center px-6 py-10 relative">
+    <div className="min-h-screen bg-gradient-subtle dark:bg-[#112C22] flex flex-col items-center justify-center px-6 py-10 relative">
       <div className="absolute top-4 right-4">
         <ThemeToggle />
       </div>
@@ -54,9 +54,8 @@ const Onboarding = () => {
         <img
           src={slide.icon}
           alt={slide.title}
-          className="w-32 h-32 md:w-40 md:h-40 object-contain mb-8"
+          className="w-56 h-56 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 object-contain mb-8"
           onError={(e) => {
-            // cast the event target to HTMLImageElement before accessing style
             (e.target as HTMLImageElement).style.display = "none";
           }}
         />

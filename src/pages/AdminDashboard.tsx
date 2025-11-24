@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Gift, MapPin, Users, Recycle, LogOut } from "lucide-react";
 import { toast } from "sonner";
-import VoucherManagement from "@/components/VoucherManagement";
-import LocationManagement from "@/components/LocationManagement";
+import VoucherManagement from "@/components/Admin/VoucherManagement";
+import LocationManagement from "@/components/Admin/LocationManagement";
 
 interface Stats {
   totalBottles: number;
