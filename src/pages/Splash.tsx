@@ -6,32 +6,45 @@ const Splash = () => {
   const navigate = useNavigate();
   const [animationStage, setAnimationStage] = useState(0);
 
+  const [isReady, setIsReady] = useState(false);
+
   useEffect(() => {
-    const timings = [
-      { stage: 1, delay: 300 },    // Icon fade in
-      { stage: 2, delay: 1000 },   // Icon + text appear
-      { stage: 3, delay: 2000 },   // Navigate
-    ];
-
-    const timeouts = timings.map(({ stage, delay }) =>
-      setTimeout(() => setAnimationStage(stage), delay)
-    );
-
-    const navigateTimer = setTimeout(async () => {
+    const checkSessionAndNavigate = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         navigate("/home");
-      } else {
+        setIsReady(true);
+        return;
+      }
+
+      // If no session, proceed with splash screen animation
+      const timings = [
+        { stage: 1, delay: 300 },    // Icon fade in
+        { stage: 2, delay: 1000 },   // Icon + text appear
+        { stage: 3, delay: 2000 },   // Navigate
+      ];
+
+      const timeouts = timings.map(({ stage, delay }) =>
+        setTimeout(() => setAnimationStage(stage), delay)
+      );
+
+      const navigateTimer = setTimeout(() => {
         const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
         navigate(hasSeenOnboarding ? "/onboarding":"/auth");
-      }
-    }, 2000);
+      }, 2000);
 
-    return () => {
-      timeouts.forEach(clearTimeout);
-      clearTimeout(navigateTimer);
+      setIsReady(true);
+
+      return () => {
+        timeouts.forEach(clearTimeout);
+        clearTimeout(navigateTimer);
+      };
     };
+
+    checkSessionAndNavigate();
   }, [navigate]);
+
+  if (!isReady) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary to-primary/95 flex items-center justify-center p-6 overflow-hidden">

@@ -130,7 +130,7 @@ const Auth = () => {
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center mb-4">
               <img src="/icon.png" alt="EcoTrade" className="w-10 h-10" />
-              <h1 className="text-3xl font-bold bg-gradient-to-br from-primary to-[#1DBF73] bg-clip-text text-transparent ml-2">
+              <h1 className="text-3xl font-bold bg-gradient-to-br from-primary to-[#1DBF73] bg-clip-text text-transparent">
                 coTrade
               </h1>
             </div>
@@ -150,7 +150,7 @@ const Auth = () => {
           <div className="flex gap-2 mb-6 bg-muted backdrop-blur-sm p-1 rounded-2xl">
             <button
               onClick={() => setActiveTab("login")}
-              className={`flex-1 py-2.5 px-4 rounded-xl font-semibold transition-all ${
+              className={`flex-1 py-2.5 px-4 rounded-xl font-semibold transition-all duration-300 ${
                 activeTab === "login"
                   ? "bg-gradient-to-br from-primary to-[#1DBF73] text-white shadow-lg"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
@@ -160,7 +160,7 @@ const Auth = () => {
             </button>
             <button
               onClick={() => setActiveTab("signup")}
-              className={`flex-1 py-2.5 px-4 rounded-xl font-semibold transition-all ${
+              className={`flex-1 py-2.5 px-4 rounded-xl font-semibold transition-all duration-300 ${
                 activeTab === "signup"
                   ? "bg-gradient-to-br from-primary to-[#1DBF73] text-white shadow-lg"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/70"

@@ -4,9 +4,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Splash from "./pages/Splash";
+import OnboardingRedirect from "./components/OnboardingRedirect";
 import Onboarding from "./pages/Onboarding";
 import AuthRedirect from "./components/AuthRedirect";
 import Auth from "./pages/Auth";
+import ForgotPasswordRedirect from "./components/ForgotPasswordRedirect";
 import ForgotPassword from "./pages/ForgotPassword";
 import Home from "./pages/Home";
 import LocationPage from "./pages/Location";
@@ -30,9 +32,9 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Splash />} />
-          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/onboarding" element={<OnboardingRedirect />} />
           <Route path="/auth" element={<AuthRedirect />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/forgot-password" element={<ForgotPasswordRedirect />} />
           <Route path="/home" element={<Home />} />
           <Route path="/location" element={<LocationPage />} />
           <Route path="/scan" element={<Scan />} />
