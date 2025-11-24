@@ -30,7 +30,7 @@ const Splash = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary to-primary/95 flex items-center justify-center p-6 overflow-hidden">
       {/* Single Logo Container - Size & Position Changes */}
-      <div className={`flex items-center gap-4 transition-all duration-700 ease-out ${
+      <div className={`flex items-center transition-all duration-700 ease-out ${
         animationStage === 0 
           ? "opacity-0 scale-75" 
           : animationStage === 1
@@ -61,7 +61,7 @@ const Splash = () => {
             ? "opacity-100 translate-x-0"
             : "opacity-0 -translate-x-4 pointer-events-none"
         }`}>
-          EcoTrade
+          coTrade
         </h1>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const slides = [
   {
@@ -44,7 +45,10 @@ const Onboarding = () => {
   const slide = slides[currentSlide];
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex flex-col items-center justify-center px-6 py-10">
+    <div className="min-h-screen bg-gradient-subtle dark:bg-gray-900 flex flex-col items-center justify-center px-6 py-10 relative">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <div className="flex-1 flex flex-col items-center justify-center max-w-2xl w-full">
         {/* Icon */}
         <img

@@ -32,4 +32,8 @@ export const DarkModeProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+/**
+ * Custom hook to access the dark mode context.
+ * @returns {{isDark: boolean, toggleDarkMode: () => void}} The current dark mode state and the toggle function.
+ */
 export const useDarkMode = () => useContext(DarkModeContext);
