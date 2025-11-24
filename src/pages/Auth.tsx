@@ -124,7 +124,7 @@ const Auth = () => {
 
       <div className="w-full max-w-md">
         {/* Main card */}
-        <div className="bg-card/95 backdrop-blur-2xl p-8 relative">
+        <div className="bg-card backdrop-blur-2xl p-8 relative">
 
           {/* Logo & Title */}
           <div className="text-center mb-8">
@@ -139,7 +139,7 @@ const Auth = () => {
               {activeTab === "signup" ? "Create Account" : "Welcome Back"}
             </h2>
 
-            <p className="text-sm text-muted-foreground/70">
+            <p className="text-sm text-muted-foreground">
               {activeTab === "signup"
                 ? "Join now and start earning from recycling!"
                 : "Sign in to continue recycling and earning points"}
@@ -147,7 +147,7 @@ const Auth = () => {
           </div>
 
           {/* Tab */}
-          <div className="flex gap-2 mb-6 bg-muted/50 backdrop-blur-sm p-1 rounded-2xl">
+          <div className="flex gap-2 mb-6 bg-muted backdrop-blur-sm p-1 rounded-2xl">
             <button
               onClick={() => setActiveTab("login")}
               className={`flex-1 py-2.5 px-4 rounded-xl font-semibold transition-all ${
@@ -174,13 +174,13 @@ const Auth = () => {
           {activeTab === "signup" && (
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="relative group">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/70 group-focus-within:text-primary z-10" />
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/90 group-focus-within:text-primary z-10" />
                 <input
                   type="text"
                   placeholder="Fullname"
                   value={signupFullName}
                   onChange={(e) => setSignupFullName(e.target.value)}
-                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
+                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
               </div>
@@ -192,7 +192,7 @@ const Auth = () => {
                   placeholder="Username"
                   value={signupUsername}
                   onChange={(e) => setSignupUsername(e.target.value)}
-                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
+                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
               </div>
@@ -204,7 +204,7 @@ const Auth = () => {
                   placeholder="Email"
                   value={signupEmail}
                   onChange={(e) => setSignupEmail(e.target.value)}
-                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
+                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
               </div>
@@ -217,7 +217,7 @@ const Auth = () => {
                   placeholder="Password"
                   value={signupPassword}
                   onChange={(e) => setSignupPassword(e.target.value)}
-                  className="relative w-full pl-12 pr-12 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
+                  className="relative w-full pl-12 pr-12 py-3.5 bg-muted backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
                 {showSignupPassword ? (
@@ -241,7 +241,7 @@ const Auth = () => {
                   placeholder="Confirm Password"
                   value={signupConfirmPassword}
                   onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                  className="relative w-full pl-12 pr-12 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
+                  className="relative w-full pl-12 pr-12 py-3.5 bg-muted backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
                 {showSignupConfirmPassword ? (
@@ -268,10 +268,10 @@ const Auth = () => {
               {/* Divider */}
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-border/50" />
+                  <div className="w-full border-t border-border/70" />
                 </div>
                 <div className="relative flex justify-center text-xs">
-                  <span className="bg-card px-3 text-muted-foreground/70 font-medium">
+                  <span className="bg-card px-3 text-muted-foreground font-medium">
                     Or sign up with
                   </span>
                 </div>
@@ -280,7 +280,7 @@ const Auth = () => {
               <button
                 type="button"
                 onClick={handleGoogleLogin}
-                className="w-full py-3.5 bg-muted/50 backdrop-blur-sm text-foreground border border-border/50 rounded-xl flex items-center justify-center gap-2 hover:bg-muted/70 font-medium"
+                className="w-full py-3.5 bg-muted backdrop-blur-sm text-foreground border border-border/50 rounded-xl flex items-center justify-center gap-2 hover:bg-muted/70 font-medium"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path
@@ -315,7 +315,7 @@ const Auth = () => {
                   placeholder="Email"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
-                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
+                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
               </div>
@@ -328,7 +328,7 @@ const Auth = () => {
                   placeholder="Password"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  className="relative w-full pl-12 pr-12 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
+                  className="relative w-full pl-12 pr-12 py-3.5 bg-muted backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
                 {showLoginPassword ? (
@@ -368,7 +368,7 @@ const Auth = () => {
                   <div className="w-full border-t border-border/50" />
                 </div>
                 <div className="relative flex justify-center text-xs">
-                  <span className="bg-card px-3 text-muted-foreground/70 font-medium">
+                  <span className="bg-card px-3 text-muted-foreground font-medium">
                     Or sign in with
                   </span>
                 </div>
@@ -377,7 +377,7 @@ const Auth = () => {
               <button
                 type="button"
                 onClick={handleGoogleLogin}
-                className="w-full py-3.5 bg-muted/50 backdrop-blur-sm text-foreground border border-border/50 rounded-xl flex items-center justify-center gap-2 hover:bg-muted/70 font-medium"
+                className="w-full py-3.5 bg-muted backdrop-blur-sm text-foreground border border-border/50 rounded-xl flex items-center justify-center gap-2 hover:bg-muted/70 font-medium"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path
@@ -406,13 +406,13 @@ const Auth = () => {
 
       {/* ===================== EMAIL VERIFICATION MODAL ===================== */}
       {showEmailModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="max-w-md w-full">
             {/* Modal card */}
             <div className="bg-card/95 backdrop-blur-2xl rounded-[28px] p-8 shadow-2xl border-2 border-white/20 dark:border-white/10 relative">
               <button
                 onClick={handleCloseModal}
-                className="absolute top-4 right-4 text-muted-foreground/70 hover:text-foreground p-1 hover:bg-muted/50 rounded-full"
+                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground p-1 hover:bg-muted rounded-full"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -426,17 +426,17 @@ const Auth = () => {
                   Verifikasi Email Anda
                 </h3>
 
-                <p className="text-muted-foreground/70 mb-6">
+                <p className="text-muted-foreground mb-6">
                   Kami telah mengirimkan link verifikasi ke email:
                 </p>
 
-                <div className="bg-gradient-to-br from-primary/10 to-[#1DBF73]/10 backdrop-blur-sm rounded-xl p-4 mb-6 border border-primary/20">
+                <div className="bg-gradient-to-br from-primary/20 to-[#1DBF73]/20 backdrop-blur-sm rounded-xl p-4 mb-6 border border-primary/20">
                   <p className="text-primary font-semibold break-all">
                     {registeredEmail}
                   </p>
                 </div>
 
-                <p className="text-sm text-muted-foreground/70 mb-6">
+                <p className="text-sm text-muted-foreground mb-6">
                   Silakan cek inbox atau folder spam Anda dan klik link verifikasi untuk mengaktifkan akun Anda.
                 </p>
 
@@ -447,7 +447,7 @@ const Auth = () => {
                   Mengerti
                 </button>
 
-                <p className="text-xs text-muted-foreground/70 mt-4">
+                <p className="text-xs text-muted-foreground mt-4">
                   Tidak menerima email? Cek folder spam atau hubungi support
                 </p>
               </div>
