@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 const Splash = () => {
   const navigate = useNavigate();
@@ -16,9 +17,14 @@ const Splash = () => {
       setTimeout(() => setAnimationStage(stage), delay)
     );
 
-    const navigateTimer = setTimeout(() => {
-      const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
-      navigate(hasSeenOnboarding ? "/onboarding":"/auth");
+    const navigateTimer = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate("/home");
+      } else {
+        const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
+        navigate(hasSeenOnboarding ? "/onboarding":"/auth");
+      }
     }, 2000);
 
     return () => {

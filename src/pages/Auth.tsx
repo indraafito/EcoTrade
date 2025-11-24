@@ -147,23 +147,23 @@ const Auth = () => {
           </div>
 
           {/* Tab */}
-          <div className="flex gap-2 mb-6 bg-muted/30 backdrop-blur-sm p-1 rounded-2xl">
+          <div className="flex gap-2 mb-6 bg-muted/50 backdrop-blur-sm p-1 rounded-2xl">
             <button
               onClick={() => setActiveTab("login")}
-              className={`flex-1 py-2.5 px-4 rounded-xl font-semibold ${
+              className={`flex-1 py-2.5 px-4 rounded-xl font-semibold transition-all ${
                 activeTab === "login"
                   ? "bg-gradient-to-br from-primary to-[#1DBF73] text-white shadow-lg"
-                  : "text-muted-foreground/70 hover:text-foreground hover:bg-muted/50"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
               }`}
             >
               Sign in
             </button>
             <button
               onClick={() => setActiveTab("signup")}
-              className={`flex-1 py-2.5 px-4 rounded-xl font-semibold ${
+              className={`flex-1 py-2.5 px-4 rounded-xl font-semibold transition-all ${
                 activeTab === "signup"
                   ? "bg-gradient-to-br from-primary to-[#1DBF73] text-white shadow-lg"
-                  : "text-muted-foreground/70 hover:text-foreground hover:bg-muted/50"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
               }`}
             >
               Sign Up
@@ -180,7 +180,7 @@ const Auth = () => {
                   placeholder="Fullname"
                   value={signupFullName}
                   onChange={(e) => setSignupFullName(e.target.value)}
-                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30"
+                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
               </div>
@@ -192,7 +192,7 @@ const Auth = () => {
                   placeholder="Username"
                   value={signupUsername}
                   onChange={(e) => setSignupUsername(e.target.value)}
-                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30"
+                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
               </div>
@@ -204,7 +204,7 @@ const Auth = () => {
                   placeholder="Email"
                   value={signupEmail}
                   onChange={(e) => setSignupEmail(e.target.value)}
-                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30"
+                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
               </div>
@@ -217,7 +217,7 @@ const Auth = () => {
                   placeholder="Password"
                   value={signupPassword}
                   onChange={(e) => setSignupPassword(e.target.value)}
-                  className="relative w-full pl-12 pr-12 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30"
+                  className="relative w-full pl-12 pr-12 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
                 {showSignupPassword ? (
@@ -241,7 +241,7 @@ const Auth = () => {
                   placeholder="Confirm Password"
                   value={signupConfirmPassword}
                   onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                  className="relative w-full pl-12 pr-12 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30"
+                  className="relative w-full pl-12 pr-12 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
                 {showSignupConfirmPassword ? (
@@ -315,7 +315,7 @@ const Auth = () => {
                   placeholder="Email"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
-                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30"
+                  className="relative w-full pl-12 pr-4 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
               </div>
@@ -328,7 +328,7 @@ const Auth = () => {
                   placeholder="Password"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  className="relative w-full pl-12 pr-12 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30"
+                  className="relative w-full pl-12 pr-12 py-3.5 bg-muted/50 backdrop-blur-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 border border-transparent focus:border-primary/30 placeholder:text-muted-foreground"
                   required
                 />
                 {showLoginPassword ? (
