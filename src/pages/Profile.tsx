@@ -19,6 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useDarkMode } from "@/components/DarkMode";
+import { Barcode } from 'lucide-react';
+import BarcodeDisplay from 'react-barcode';
 
 import {
   User,
@@ -38,6 +40,7 @@ import {
   Mail,
   AlertCircle,
   CheckCircle2,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,8 +53,13 @@ interface Profile {
 
 interface VoucherRedemption {
   id: string;
+  voucher_id: string;
+  user_id: string;
   redeemed_at: string;
-  vouchers: {
+  is_used: boolean;
+  voucher_title?: string;
+  voucher_type?: string;
+  vouchers?: {
     title: string;
     type: string;
   };
@@ -79,6 +87,7 @@ const ProfilePage = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [redemptions, setRedemptions] = useState<VoucherRedemption[]>([]);
+  const [selectedVoucher, setSelectedVoucher] = useState<VoucherRedemption | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,7 +107,7 @@ const ProfilePage = () => {
     fetchProfile();
     fetchRedemptions();
     fetchActivities();
-    fetchUserPasswordStatus();
+    // fetchUserPasswordStatus(); // Disabled temporarily
   }, []);
 
   const fetchProfile = async () => {
@@ -125,25 +134,48 @@ const ProfilePage = () => {
 
   const fetchRedemptions = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Silakan login kembali");
+        return;
+      }
 
+      console.log("Mengambil data voucher untuk user:", user.id);
+      
+      // Ambil data dengan join ke tabel vouchers
       const { data, error } = await supabase
         .from("voucher_redemptions")
         .select(`
-          id,
-          redeemed_at,
-          vouchers (title, type)
+          *,
+          vouchers!inner(title, type)
         `)
         .eq("user_id", user.id)
         .order("redeemed_at", { ascending: false });
 
-      if (error) throw error;
-      setRedemptions(data || []);
-    } catch (error: any) {
-      toast.error("Gagal memuat riwayat voucher");
+      if (error) {
+        console.error("Error mengambil data voucher:", error);
+        throw error;
+      }
+
+      console.log("Data voucher yang diterima:", data);
+      
+      // Format data yang diterima
+      const formattedData = data.map(item => ({
+        id: item.id,
+        user_id: item.user_id,
+        voucher_id: item.voucher_id,
+        redeemed_at: item.redeemed_at,
+        is_used: false, // Default value karena kolom tidak ada
+        voucher_title: item.vouchers?.title || `Voucher ${item.voucher_id?.slice(0, 6) || ''}`,
+        voucher_type: item.vouchers?.type || 'general',
+        vouchers: item.vouchers
+      }));
+      
+      setRedemptions(formattedData);
+    } catch (error) {
+      console.error("Error dalam fetchRedemptions:", error);
+      toast.error("Gagal memuat daftar voucher");
+      setRedemptions([]);
     }
   };
 
@@ -174,41 +206,6 @@ const ProfilePage = () => {
     }
   };
 
-  // ============================================
-  // FETCH USER PASSWORD STATUS
-  // ============================================
-  const fetchUserPasswordStatus = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .rpc('get_user_password_status', { _user_id: user.id });
-
-      if (error) throw error;
-      
-      if (data && data.length > 0) {
-        setUserPasswordStatus(data[0]);
-      }
-    } catch (error: any) {
-      console.error("Error fetching password status:", error);
-      // Fallback: assume email auth if RPC fails
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserPasswordStatus({
-          user_id: user.id,
-          email: user.email || "",
-          has_password: true,
-          auth_provider: "email",
-          is_google_user: false,
-        });
-      }
-    }
-  };
-
-  // ============================================
-  // HANDLE PASSWORD CHANGE
-  // ============================================
   const handleChangePassword = async () => {
     if (!userPasswordStatus) return;
 
@@ -422,27 +419,100 @@ const ProfilePage = () => {
               redemptions.map((redemption) => (
                 <div
                   key={redemption.id}
-                  className="bg-card/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-border/50"
+                  onClick={() => setSelectedVoucher(redemption)}
+                  className="bg-card/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-border/50 active:scale-[0.98] transition-transform cursor-pointer"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-[#1DBF73]/20 flex items-center justify-center">
-                      <Gift className="w-6 h-6 text-primary" />
-                    </div>
                     <div className="flex-1">
-                      <p className="font-bold text-foreground">{redemption.vouchers.title}</p>
-                      <p className="text-sm text-muted-foreground capitalize">{redemption.vouchers.type}</p>
+                      <p className="font-bold text-foreground">
+                        {redemption.vouchers?.title || `Voucher ${redemption.voucher_id.slice(0, 6)}`}
+                      </p>
+                      <p className="text-sm text-muted-foreground capitalize">
+                        {redemption.vouchers?.type || 'Voucher'}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(redemption.redeemed_at).toLocaleDateString("id-ID", {
-                        day: "numeric",
-                        month: "short",
-                      })}
-                    </p>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(redemption.redeemed_at).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </p>
+                      <div className="flex items-center justify-end gap-1 text-xs text-primary mt-1">
+                        <Barcode className="w-3 h-3" />
+                        <span>Lihat kode</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))
             )}
           </TabsContent>
+
+          {/* Voucher Barcode Dialog */}
+          <Dialog open={!!selectedVoucher} onOpenChange={(open) => !open && setSelectedVoucher(null)}>
+            <DialogContent className="sm:max-w-md rounded-3xl">
+              <DialogHeader>
+                <DialogTitle className="text-center">Kode Voucher</DialogTitle>
+                <DialogDescription className="text-center">
+                  Tunjukkan barcode ini ke kasir untuk menukarkan voucher
+                </DialogDescription>
+              </DialogHeader>
+              
+              {selectedVoucher && (
+                <div className="flex flex-col items-center py-4">
+                  <div className="bg-white p-4 rounded-xl mb-4 w-full max-w-[300px]">
+                    <div className="flex justify-center mb-2">
+                      <BarcodeDisplay 
+                        value={selectedVoucher.id} 
+                        width={1.5}
+                        height={80}
+                        displayValue={false}
+                        margin={0}
+                        background="transparent"
+                        lineColor="#000"
+                      />
+                    </div>
+                    <div className="text-center mt-3">
+                      <p className="font-mono text-lg font-bold tracking-widest">
+                        {selectedVoucher.vouchers?.title || `Voucher ${selectedVoucher.id.slice(0, 6)}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {selectedVoucher.vouchers?.type || 'Voucher'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(selectedVoucher.redeemed_at).toLocaleDateString("id-ID", {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="gap-2"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedVoucher.id);
+                      toast.success('Kode voucher disalin ke clipboard');
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                    Salin Kode
+                  </Button>
+                  
+                  {selectedVoucher.is_used && (
+                    <div className="mt-4 text-amber-600 text-sm flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      Voucher ini sudah digunakan
+                    </div>
+                  )}
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
 
           {/* HISTORY TAB */}
           <TabsContent value="history" className="space-y-3 mt-4">
@@ -692,17 +762,17 @@ const ProfilePage = () => {
             </div>
 
             {/* Language */}
-            <div className="bg-card/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-border/50">
+            {/* <div className="bg-card/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-border/50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {/* <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                     <Globe className="w-5 h-5 text-primary" />
                   </div>
                   <span className="font-semibold text-foreground">Bahasa</span>
-                </div> */}
+                </div>
                 <span className="text-muted-foreground font-medium">Indonesia</span>
               </div>
-            </div>
+            </div> */}
 
             {/* Logout */}
             <div
