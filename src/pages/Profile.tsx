@@ -694,7 +694,7 @@ const ProfilePage = () => {
                         setConfirmPassword("");
                       }}
                       disabled={isPasswordLoading}
-                      className="rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      className="rounded-xl hover:bg-green-200 dark:hover:bg-green-800 hover:text-green-900 dark:hover:text-green-100"
                     >
                       Batal
                     </Button>
