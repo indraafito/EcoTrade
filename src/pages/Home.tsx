@@ -11,12 +11,11 @@ import {
   TrendingUp,
   Leaf,
   Award,
-  Package,
   Bell,
   Droplets,
-  DollarSign,
   Gift,
-  Target,
+  CheckCircle2,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,6 +45,7 @@ interface Mission {
   id: string;
   mission_id: string;
   mission_title: string;
+  description?: string;
   target_type: string;
   target_value: number;
   progress_value: number;
@@ -54,6 +54,7 @@ interface Mission {
   completed_at: string | null;
   verified: boolean;
   status: string;
+  difficulty?: string;
 }
 
 const Home = () => {
@@ -63,6 +64,7 @@ const Home = () => {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [weeklyPoints, setWeeklyPoints] = useState(0);
+  const [claimingMission, setClaimingMission] = useState<string | null>(null);
 
   useEffect(() => {
     checkAuth();
@@ -85,99 +87,76 @@ const Home = () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      
+
       if (!user) {
         console.error("No user found");
         navigate("/auth");
         return;
       }
 
-      console.log("Fetching profile for user:", user.id);
-
-      // Query untuk mengambil data profil
       const { data: profileData, error } = await supabase
         .from("profiles")
-        .select(`
-          username, 
-          full_name, 
-          points, 
-          rank, 
-          total_bottles, 
-          total_weight_kg
-        `)
+        .select("username, full_name, points, rank, total_bottles, total_weight_kg")
         .eq("user_id", user.id)
         .single();
-        
-      // Hitung jumlah voucher dari tabel voucher_redemptions
+
       const { count: voucherCount } = await supabase
-        .from('voucher_redemptions')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-        
-      // Gabungkan data profil dengan jumlah voucher
+        .from("voucher_redemptions")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
       const data = {
         ...profileData,
-        total_vouchers: voucherCount || 0
+        total_vouchers: voucherCount || 0,
       };
 
       if (error) {
-        console.error("Profile fetch error:", error);
-        
-        // Jika profile tidak ada, buat profile baru
-        if (error.code === 'PGRST116') {
-          console.log("Profile not found, creating default profile...");
-          
+        if (error.code === "PGRST116") {
           const { data: newProfile, error: insertError } = await supabase
             .from("profiles")
             .insert([
               {
                 user_id: user.id,
-                username: user.email?.split('@')[0] || 'user',
-                full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+                username: user.email?.split("@")[0] || "user",
+                full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
                 points: 0,
                 rank: 0,
                 total_bottles: 0,
                 total_weight_kg: 0,
-              }
+              },
             ])
             .select()
             .single();
-          
+
           if (insertError) {
             console.error("Error creating profile:", insertError);
             toast.error("Gagal membuat profil: " + insertError.message);
             return;
           }
-          
-          // Tambahkan nilai default untuk kolom tambahan
+
           const profileWithDefaults = {
             ...newProfile,
             total_carbon_emission: 0,
             total_earnings: 0,
           };
-          
+
           setProfile(profileWithDefaults);
           toast.success("Profil berhasil dibuat!");
           return;
         }
-        
         throw error;
       }
 
-      console.log("Profile loaded:", data);
-      
-      // Hitung estimasi carbon emission dan earnings dari data yang ada
-      const estimatedCarbonEmission = (data.total_weight_kg || 0) * 0.5; // Estimasi: 0.5 kg CO2 per kg plastik
-      const estimatedEarnings = (data.points || 0) * 10; // Estimasi: 10 rupiah per poin
-      
+      const estimatedCarbonEmission = (data.total_weight_kg || 0) * 0.5;
+      const estimatedEarnings = (data.points || 0) * 10;
+
       const profileWithEstimates = {
         ...data,
         total_carbon_emission: estimatedCarbonEmission,
         total_earnings: estimatedEarnings,
       };
-      
+
       setProfile(profileWithEstimates);
-      
     } catch (error: any) {
       console.error("Fetch profile error:", error);
       toast.error("Gagal memuat profil: " + (error.message || "Unknown error"));
@@ -195,22 +174,16 @@ const Home = () => {
 
       const { data, error } = await supabase
         .from("activities")
-        .select(`
-          id,
-          bottles_count,
-          points_earned,
-          created_at,
-          locations (name)
-        `)
+        .select("id, bottles_count, points_earned, created_at, locations (name)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(5);
 
       if (error) throw error;
+
       const activitiesData = data || [];
       setActivities(activitiesData);
 
-      // Calculate weekly points
       const now = new Date();
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(now.getDate() - 7);
@@ -233,14 +206,12 @@ const Home = () => {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      console.log("Fetching missions for user:", user.id);
-
-      // Ambil semua misi aktif
-      // @ts-ignore
+      // Fetch active missions only
       const { data: allMissions, error: missionsError } = await supabase
-        .from('missions')
-        .select('*')
-        .limit(10);
+        .from("missions")
+        .select("*")
+        .eq("is_active", true)
+        .order("difficulty", { ascending: true });
 
       if (missionsError) {
         console.error("Error fetching missions:", missionsError);
@@ -249,51 +220,46 @@ const Home = () => {
       }
 
       if (!allMissions || allMissions.length === 0) {
-        console.log("No missions found in database");
+        console.log("No active missions found");
         setMissions([]);
         return;
       }
 
-      console.log("Available missions:", allMissions);
-
-      // Ambil progress user untuk semua misi
-      // @ts-ignore
+      // Fetch user's mission progress
       const { data: userProgress, error: progressError } = await supabase
-        .from('mission_progress')
-        .select('*')
-        .eq('user_id', user.id);
+        .from("mission_progress")
+        .select("*")
+        .eq("user_id", user.id)
+        .in("status", ["in_progress", "completed"]);
 
-      console.log("User progress:", userProgress);
+      if (progressError) {
+        console.error("Error fetching progress:", progressError);
+      }
 
-      // Jika user belum punya progress sama sekali, auto-create untuk 2 misi pertama
+      // If no progress exists, create initial progress for first 3 missions
       if (!userProgress || userProgress.length === 0) {
-        console.log("No progress found, creating initial mission progress...");
-        
-        const initialMissions = allMissions.slice(0, 2);
-        const progressToCreate = initialMissions.map(mission => ({
+        const initialMissions = allMissions.slice(0, 3);
+        const progressToCreate = initialMissions.map((mission) => ({
           user_id: user.id,
           mission_id: mission.id,
           progress_value: 0,
-          status: 'in_progress'
+          status: "in_progress",
         }));
 
-        // @ts-ignore
         const { data: newProgress, error: createError } = await supabase
-          .from('mission_progress')
+          .from("mission_progress")
           .insert(progressToCreate)
           .select();
 
         if (createError) {
           console.error("Error creating mission progress:", createError);
-        } else {
-          console.log("Mission progress created:", newProgress);
         }
 
-        // Transform misi untuk ditampilkan
-        const transformedMissions = initialMissions.map(m => ({
+        const transformedMissions = initialMissions.map((m) => ({
           id: m.id,
           mission_id: m.id,
           mission_title: m.title,
+          description: m.description,
           target_type: m.target_type,
           target_value: m.target_value,
           progress_value: 0,
@@ -301,41 +267,104 @@ const Home = () => {
           points_bonus: m.points_bonus,
           completed_at: null,
           verified: false,
-          status: 'in_progress',
+          status: "in_progress",
+          difficulty: m.difficulty,
         }));
 
         setMissions(transformedMissions);
         return;
       }
 
-      // Jika user sudah punya progress, gabungkan dengan data misi
+      // Map missions with progress
       const missionsWithProgress = allMissions
-        .map(mission => {
-          const progress = userProgress.find(p => p.mission_id === mission.id);
-          if (!progress || progress.status !== 'in_progress') return null;
+        .map((mission) => {
+          const progress = userProgress.find((p) => p.mission_id === mission.id);
+          if (!progress) return null;
+          if (progress.status === "claimed" || progress.status === "expired") return null;
 
           return {
             id: progress.id,
             mission_id: mission.id,
             mission_title: mission.title,
+            description: mission.description,
             target_type: mission.target_type,
             target_value: mission.target_value,
             progress_value: progress.progress_value || 0,
-            progress_percentage: ((progress.progress_value || 0) / mission.target_value) * 100,
+            progress_percentage: Math.min(
+              ((progress.progress_value || 0) / mission.target_value) * 100,
+              100
+            ),
             points_bonus: mission.points_bonus,
             completed_at: progress.completed_at,
             verified: progress.verified || false,
             status: progress.status,
+            difficulty: mission.difficulty,
           };
         })
         .filter(Boolean)
-        .slice(0, 2);
+        .slice(0, 3);
 
-      console.log("Missions with progress:", missionsWithProgress);
       setMissions(missionsWithProgress as Mission[]);
     } catch (error: any) {
       console.error("Error fetching missions:", error);
       setMissions([]);
+    }
+  };
+
+  const claimMissionReward = async (missionProgressId: string, pointsBonus: number) => {
+    try {
+      setClaimingMission(missionProgressId);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Update mission progress to claimed
+      const { error: updateError } = await supabase
+        .from("mission_progress")
+        .update({
+          status: "claimed",
+          claimed_at: new Date().toISOString(),
+          verified: true,
+        })
+        .eq("id", missionProgressId);
+
+      if (updateError) throw updateError;
+
+      // Update user points
+      const { error: pointsError } = await supabase
+        .from("profiles")
+        .update({
+          points: (profile?.points || 0) + pointsBonus,
+        })
+        .eq("user_id", user.id);
+
+      if (pointsError) throw pointsError;
+
+      toast.success(`🎉 Selamat! Kamu mendapat ${pointsBonus} poin!`);
+
+      // Refresh data
+      await fetchProfile();
+      await fetchMissions();
+    } catch (error: any) {
+      console.error("Error claiming reward:", error);
+      toast.error("Gagal claim reward: " + error.message);
+    } finally {
+      setClaimingMission(null);
+    }
+  };
+
+  const getDifficultyColor = (difficulty?: string) => {
+    switch (difficulty) {
+      case "easy":
+        return "bg-green-500/10 text-green-600 dark:text-green-400";
+      case "medium":
+        return "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400";
+      case "hard":
+        return "bg-red-500/10 text-red-600 dark:text-red-400";
+      default:
+        return "bg-primary/10 text-primary";
     }
   };
 
@@ -347,7 +376,6 @@ const Home = () => {
     <div className="min-h-screen bg-gradient-to-br from-[#1DBF73]/5 via-background to-primary/5 pb-28">
       {/* ================= HEADER WITH GRADIENT ================= */}
       <div className="relative bg-gradient-to-br from-primary via-[#17a865] to-[#1DBF73] px-6 pt-12 pb-32 overflow-hidden">
-        {/* Decorative circles */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/3 blur-2xl" />
 
@@ -364,21 +392,19 @@ const Home = () => {
               <p className="text-white/70 text-xs">Keep saving the planet!</p>
             </div>
           </div>
-
           <button
             onClick={() => navigate("/notifications")}
             className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-lg hover:bg-white/30 transition-colors"
           >
-          <Bell className="w-6 h-6 text-white" />             </button>
+            <Bell className="w-6 h-6 text-white" />
+          </button>
         </div>
       </div>
 
-      {/* ================= FLOATING POINT CARD WITH GLASSMORPHISM ================= */}
+      {/* ================= FLOATING POINT CARD ================= */}
       <div className="-mt-20 px-6 relative z-20">
         <div className="bg-card/80 backdrop-blur-xl rounded-3xl shadow-2xl p-6 border border-white/20 dark:border-white/10 relative overflow-hidden">
-          {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
-
           <div className="relative z-10">
             <div className="flex justify-between items-center">
               <div className="flex-1">
@@ -398,65 +424,20 @@ const Home = () => {
                   </p>
                 </div>
               </div>
-
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-[#1DBF73] flex items-center justify-center shadow-lg">
+              <button
+                onClick={() => navigate("/leaderboard")}
+                className="flex flex-col items-center gap-2 hover:scale-110 transition-transform"
+              >
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-[#1DBF73] flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow">
                   <Award className="w-9 h-9 text-white" />
                 </div>
-                <p className="text-xs font-bold text-foreground text-center">
+                <p className="text-xs font-bold text-foreground text-center cursor-pointer hover:text-primary transition-colors">
                   Rank #{profile?.rank || "-"}
                 </p>
-              </div>
+              </button>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* ================= QUICK MENU ================= */}
-      <div className="grid grid-cols-2 gap-4 px-6 mt-6">
-        <button
-          onClick={() => navigate("/vouchers")}
-          className="bg-card rounded-2xl p-4 shadow-lg border border-border hover:shadow-xl transition-all text-left hover:scale-[1.02]"
-        >
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-            <Package className="w-5 h-5 text-primary" />
-          </div>
-          <p className="font-semibold text-foreground text-sm">Tukar Poin</p>
-          <p className="text-xs text-muted-foreground">Voucher & Hadiah</p>
-        </button>
-
-        <button
-          onClick={() => navigate("/leaderboard")}
-          className="bg-card rounded-2xl p-4 shadow-lg border border-border hover:shadow-xl transition-all text-left hover:scale-[1.02]"
-        >
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-            <Trophy className="w-5 h-5 text-primary" />
-          </div>
-          <p className="font-semibold text-foreground text-sm">Leaderboard</p>
-          <p className="text-xs text-muted-foreground">Top Recyclers</p>
-        </button>
-
-        <button
-          onClick={() => navigate("/profile")}
-          className="bg-card rounded-2xl p-4 shadow-lg border border-border hover:shadow-xl transition-all text-left hover:scale-[1.02]"
-        >
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-            <Clock className="w-5 h-5 text-primary" />
-          </div>
-          <p className="font-semibold text-foreground text-sm">Riwayat</p>
-          <p className="text-xs text-muted-foreground">Aktivitas Anda</p>
-        </button>
-
-        <button
-          onClick={() => navigate("/missions")}
-          className="bg-card rounded-2xl p-4 shadow-lg border border-border hover:shadow-xl transition-all text-left hover:scale-[1.02]"
-        >
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-            <Target className="w-5 h-5 text-primary" />
-          </div>
-          <p className="font-semibold text-foreground text-sm">Misi</p>
-          <p className="text-xs text-muted-foreground">Bonus Poin</p>
-        </button>
       </div>
 
       {/* ================= MISI HARIAN ================= */}
@@ -476,14 +457,25 @@ const Home = () => {
             {missions.map((mission) => (
               <div
                 key={mission.id}
-                className="bg-card/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-border/50 hover:shadow-lg transition-shadow"
+                className="bg-card/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-border/50 hover:shadow-lg transition-all"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <p className="font-bold text-foreground text-sm">
-                      {mission.mission_title}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-bold text-foreground text-sm">
+                        {mission.mission_title}
+                      </p>
+                      {mission.difficulty && (
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${getDifficultyColor(
+                            mission.difficulty
+                          )}`}
+                        >
+                          {mission.difficulty}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
                       Progress: {mission.progress_value}/{mission.target_value}{" "}
                       {mission.target_type}
                     </p>
@@ -494,7 +486,8 @@ const Home = () => {
                     </p>
                   </div>
                 </div>
-                <div className="w-full bg-muted rounded-full h-2">
+
+                <div className="w-full bg-muted rounded-full h-2 mb-2">
                   <div
                     className="bg-gradient-to-r from-primary to-[#1DBF73] h-2 rounded-full transition-all"
                     style={{
@@ -502,15 +495,36 @@ const Home = () => {
                     }}
                   />
                 </div>
-                <div className="flex items-center justify-between mt-2">
+
+                <div className="flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
                     {mission.progress_percentage.toFixed(0)}% Selesai
                   </p>
-                  <p className="text-xs font-semibold text-primary capitalize">
-                    {mission.status === "in_progress"
-                      ? "Berlangsung"
-                      : mission.status}
-                  </p>
+                  {mission.status === "completed" ? (
+                    <button
+                      onClick={() =>
+                        claimMissionReward(mission.id, mission.points_bonus)
+                      }
+                      disabled={claimingMission === mission.id}
+                      className="flex items-center gap-1.5 bg-gradient-to-r from-primary to-[#1DBF73] text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg transition-all disabled:opacity-50"
+                    >
+                      {claimingMission === mission.id ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span>Claiming...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Claim Reward</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <p className="text-xs font-semibold text-primary capitalize">
+                      Berlangsung
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
@@ -521,7 +535,6 @@ const Home = () => {
       {/* ================= DAMPAK KAMU ================= */}
       <div className="px-6 mb-8">
         <h2 className="text-xl font-bold text-foreground mb-4">Dampak Kamu</h2>
-
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-card rounded-2xl p-4 shadow-lg border border-border">
             <div className="w-10 h-10 rounded-xl bg-[#1DBF73]/10 flex items-center justify-center mb-3">
@@ -634,7 +647,6 @@ const Home = () => {
                         </p>
                       </div>
                     </div>
-
                     <div className="text-right">
                       <div className="bg-primary/10 px-3 py-1 rounded-lg mb-1.5">
                         <p className="font-black text-primary text-base">
@@ -657,7 +669,6 @@ const Home = () => {
                   </div>
                 </div>
               ))}
-
               {activities.length > 5 && (
                 <button
                   onClick={() => navigate("/profile")}
