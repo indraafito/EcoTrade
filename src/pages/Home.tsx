@@ -15,6 +15,7 @@ import {
   Bell,
   Droplets,
   DollarSign,
+  Gift,
   Target,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -28,6 +29,7 @@ interface Profile {
   total_weight_kg: number;
   total_carbon_emission?: number;
   total_earnings?: number;
+  total_vouchers?: number;
 }
 
 interface Activity {
@@ -92,12 +94,31 @@ const Home = () => {
 
       console.log("Fetching profile for user:", user.id);
 
-      // Query hanya kolom yang ada di database
-      const { data, error } = await supabase
+      // Query untuk mengambil data profil
+      const { data: profileData, error } = await supabase
         .from("profiles")
-        .select("username, full_name, points, rank, total_bottles, total_weight_kg")
+        .select(`
+          username, 
+          full_name, 
+          points, 
+          rank, 
+          total_bottles, 
+          total_weight_kg
+        `)
         .eq("user_id", user.id)
         .single();
+        
+      // Hitung jumlah voucher dari tabel voucher_redemptions
+      const { count: voucherCount } = await supabase
+        .from('voucher_redemptions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+        
+      // Gabungkan data profil dengan jumlah voucher
+      const data = {
+        ...profileData,
+        total_vouchers: voucherCount || 0
+      };
 
       if (error) {
         console.error("Profile fetch error:", error);
@@ -539,14 +560,14 @@ const Home = () => {
           </div>
 
           <div className="bg-card rounded-2xl p-4 shadow-lg border border-border">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center mb-3">
-              <DollarSign className="w-5 h-5 text-amber-600" />
+            <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center mb-3">
+              <Gift className="w-5 h-5 text-green-600" />
             </div>
             <p className="text-2xl font-black text-foreground">
-              {profile?.total_earnings || 0}
+              {profile?.total_vouchers || 0}
             </p>
             <p className="text-xs text-muted-foreground font-medium">
-              Total Penghasilan
+              Voucher Ditukar
             </p>
           </div>
         </div>
