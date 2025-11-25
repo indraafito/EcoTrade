@@ -206,105 +206,7 @@ const Home = () => {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch active missions only
-      const { data: allMissions, error: missionsError } = await supabase
-        .from("missions")
-        .select("*")
-        .eq("is_active", true)
-        .order("difficulty", { ascending: true });
-
-      if (missionsError) {
-        console.error("Error fetching missions:", missionsError);
-        setMissions([]);
-        return;
-      }
-
-      if (!allMissions || allMissions.length === 0) {
-        console.log("No active missions found");
-        setMissions([]);
-        return;
-      }
-
-      // Fetch user's mission progress
-      const { data: userProgress, error: progressError } = await supabase
-        .from("mission_progress")
-        .select("*")
-        .eq("user_id", user.id)
-        .in("status", ["in_progress", "completed"]);
-
-      if (progressError) {
-        console.error("Error fetching progress:", progressError);
-      }
-
-      // If no progress exists, create initial progress for first 3 missions
-      if (!userProgress || userProgress.length === 0) {
-        const initialMissions = allMissions.slice(0, 3);
-        const progressToCreate = initialMissions.map((mission) => ({
-          user_id: user.id,
-          mission_id: mission.id,
-          progress_value: 0,
-          status: "in_progress",
-        }));
-
-        const { data: newProgress, error: createError } = await supabase
-          .from("mission_progress")
-          .insert(progressToCreate)
-          .select();
-
-        if (createError) {
-          console.error("Error creating mission progress:", createError);
-        }
-
-        const transformedMissions = initialMissions.map((m) => ({
-          id: m.id,
-          mission_id: m.id,
-          mission_title: m.title,
-          description: m.description,
-          target_type: m.target_type,
-          target_value: m.target_value,
-          progress_value: 0,
-          progress_percentage: 0,
-          points_bonus: m.points_bonus,
-          completed_at: null,
-          verified: false,
-          status: "in_progress",
-          difficulty: m.difficulty,
-        }));
-
-        setMissions(transformedMissions);
-        return;
-      }
-
-      // Map missions with progress
-      const missionsWithProgress = allMissions
-        .map((mission) => {
-          const progress = userProgress.find((p) => p.mission_id === mission.id);
-          if (!progress) return null;
-          if (progress.status === "claimed" || progress.status === "expired") return null;
-
-          return {
-            id: progress.id,
-            mission_id: mission.id,
-            mission_title: mission.title,
-            description: mission.description,
-            target_type: mission.target_type,
-            target_value: mission.target_value,
-            progress_value: progress.progress_value || 0,
-            progress_percentage: Math.min(
-              ((progress.progress_value || 0) / mission.target_value) * 100,
-              100
-            ),
-            points_bonus: mission.points_bonus,
-            completed_at: progress.completed_at,
-            verified: progress.verified || false,
-            status: progress.status,
-            difficulty: mission.difficulty,
-          };
-        })
-        .filter(Boolean)
-        .slice(0, 3);
-
-      setMissions(missionsWithProgress as Mission[]);
+      setMissions([]);
     } catch (error: any) {
       console.error("Error fetching missions:", error);
       setMissions([]);
@@ -312,47 +214,8 @@ const Home = () => {
   };
 
   const claimMissionReward = async (missionProgressId: string, pointsBonus: number) => {
-    try {
-      setClaimingMission(missionProgressId);
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Update mission progress to claimed
-      const { error: updateError } = await supabase
-        .from("mission_progress")
-        .update({
-          status: "claimed",
-          claimed_at: new Date().toISOString(),
-          verified: true,
-        })
-        .eq("id", missionProgressId);
-
-      if (updateError) throw updateError;
-
-      // Update user points
-      const { error: pointsError } = await supabase
-        .from("profiles")
-        .update({
-          points: (profile?.points || 0) + pointsBonus,
-        })
-        .eq("user_id", user.id);
-
-      if (pointsError) throw pointsError;
-
-      toast.success(`🎉 Selamat! Kamu mendapat ${pointsBonus} poin!`);
-
-      // Refresh data
-      await fetchProfile();
-      await fetchMissions();
-    } catch (error: any) {
-      console.error("Error claiming reward:", error);
-      toast.error("Gagal claim reward: " + error.message);
-    } finally {
-      setClaimingMission(null);
-    }
+    // Missions feature not implemented yet
+    toast.info("Fitur misi akan segera hadir!");
   };
 
   const getDifficultyColor = (difficulty?: string) => {

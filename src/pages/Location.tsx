@@ -42,6 +42,7 @@ interface Location {
   latitude: number;
   longitude: number;
   is_active: boolean;
+  distance?: number;
 }
 
 // Custom Icons

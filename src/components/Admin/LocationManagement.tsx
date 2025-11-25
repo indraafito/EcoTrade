@@ -5,9 +5,27 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { MapPin } from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
+import { 
+  MapPin, 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Check, 
+  X,
+  MapPinOff,
+  MapPin as MapPinIcon
+} from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 
 interface Location {
   id: string;
@@ -24,14 +42,18 @@ interface LocationManagementProps {
 }
 
 const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
-  const [showAddLocation, setShowAddLocation] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [locations, setLocations] = useState<Location[]>([]);
-
-  // Location form state
-  const [locationName, setLocationName] = useState("");
-  const [locationAddress, setLocationAddress] = useState("");
-  const [locationLat, setLocationLat] = useState("");
-  const [locationLng, setLocationLng] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<Partial<Location> | null>(null);
+  const [formData, setFormData] = useState<Omit<Location, 'id' | 'created_at'>>({ 
+    name: '',
+    address: '',
+    latitude: 0,
+    longitude: 0,
+    is_active: true
+  });
 
   useEffect(() => {
     fetchLocations();
@@ -46,145 +68,344 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
 
       if (error) throw error;
       setLocations(data || []);
+      if (onLocationChange) onLocationChange();
     } catch (error: any) {
-      toast.error("Gagal memuat lokasi");
+      toast.error("Gagal memuat data lokasi: " + error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleAddLocation = async () => {
-    try {
-      const { error } = await supabase.from("locations").insert({
-        name: locationName,
-        address: locationAddress,
-        latitude: parseFloat(locationLat),
-        longitude: parseFloat(locationLng),
-      });
-
-      if (error) throw error;
-
-      toast.success("Lokasi berhasil ditambahkan!");
-      setShowAddLocation(false);
-      setLocationName("");
-      setLocationAddress("");
-      setLocationLat("");
-      setLocationLng("");
-      fetchLocations();
-      onLocationChange?.();
-    } catch (error: any) {
-      toast.error(error.message || "Gagal menambahkan lokasi");
-    }
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'latitude' || name === 'longitude' 
+        ? parseFloat(value) || 0 
+        : value
+    }));
   };
 
-  const handleDeleteLocation = async (id: string) => {
+  const handleSwitchChange = (checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      is_active: checked
+    }));
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      address: '',
+      latitude: 0,
+      longitude: 0,
+      is_active: true
+    });
+    setCurrentLocation(null);
+  };
+
+  const handleEdit = (location: Location) => {
+    setCurrentLocation(location);
+    setFormData({
+      name: location.name,
+      address: location.address,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      is_active: location.is_active
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus lokasi ini?')) return;
+    
     try {
       const { error } = await supabase
-        .from("locations")
-        .update({ is_active: false })
-        .eq("id", id);
+        .from('locations')
+        .delete()
+        .eq('id', id);
 
       if (error) throw error;
-
-      toast.success("Lokasi berhasil dinonaktifkan!");
+      
+      toast.success('Lokasi berhasil dihapus');
       fetchLocations();
-      onLocationChange?.();
     } catch (error: any) {
-      toast.error(error.message || "Gagal menonaktifkan lokasi");
+      toast.error('Gagal menghapus lokasi: ' + error.message);
     }
   };
 
+  const toggleStatus = async (location: Location) => {
+    try {
+      const { error } = await supabase
+        .from('locations')
+        .update({ is_active: !location.is_active })
+        .eq('id', location.id);
+
+      if (error) throw error;
+      
+      toast.success(`Lokasi berhasil ${!location.is_active ? 'diaktifkan' : 'dinonaktifkan'}`);
+      fetchLocations();
+    } catch (error: any) {
+      toast.error('Gagal memperbarui status lokasi: ' + error.message);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      if (currentLocation?.id) {
+        // Update existing location
+        const { error } = await supabase
+          .from('locations')
+          .update(formData)
+          .eq('id', currentLocation.id);
+
+        if (error) throw error;
+        toast.success('Lokasi berhasil diperbarui');
+      } else {
+        // Create new location
+        const { error } = await supabase
+          .from('locations')
+          .insert([formData]);
+
+        if (error) throw error;
+        toast.success('Lokasi berhasil ditambahkan');
+      }
+
+      setIsDialogOpen(false);
+      resetForm();
+      fetchLocations();
+    } catch (error: any) {
+      toast.error('Gagal menyimpan lokasi: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      <Dialog open={showAddLocation} onOpenChange={setShowAddLocation}>
-        <DialogTrigger asChild>
-          <Button className="w-full">
-            <MapPin className="mr-2 h-4 w-4" />
-            Tambah Lokasi
-          </Button>
-        </DialogTrigger>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold">Kelola Lokasi</h2>
+          <p className="text-sm text-muted-foreground">
+            Kelola semua lokasi pengumpulan sampah
+          </p>
+        </div>
+        <Button onClick={() => {
+          resetForm();
+          setIsDialogOpen(true);
+        }}>
+          <Plus className="mr-2 h-4 w-4" />
+          Tambah Lokasi
+        </Button>
+      </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Tambah Lokasi Baru</DialogTitle>
+            <DialogTitle>
+              {currentLocation?.id ? 'Edit Lokasi' : 'Tambah Lokasi Baru'}
+            </DialogTitle>
             <DialogDescription>
-              Masukkan detail lokasi tempat sampah EcoTrade
+              {currentLocation?.id 
+                ? 'Perbarui detail lokasi pengumpulan sampah.'
+                : 'Tambahkan lokasi pengumpulan sampah baru ke dalam sistem.'
+              }
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nama Lokasi</Label>
-              <Input
-                id="name"
-                value={locationName}
-                onChange={(e) => setLocationName(e.target.value)}
-                placeholder="EcoTrade Hub Central"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="address">Alamat</Label>
-              <Textarea
-                id="address"
-                value={locationAddress}
-                onChange={(e) => setLocationAddress(e.target.value)}
-                placeholder="Jl. Sudirman No. 123, Jakarta"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="latitude">Latitude</Label>
-                <Input
-                  id="latitude"
-                  type="number"
-                  step="0.000001"
-                  value={locationLat}
-                  onChange={(e) => setLocationLat(e.target.value)}
-                  placeholder="-6.208763"
+                <Label htmlFor="name">Nama Lokasi *</Label>
+                <Input 
+                  id="name" 
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  placeholder="Contoh: Bank Sampah Cempaka" 
+                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="longitude">Longitude</Label>
-                <Input
-                  id="longitude"
-                  type="number"
-                  step="0.000001"
-                  value={locationLng}
-                  onChange={(e) => setLocationLng(e.target.value)}
-                  placeholder="106.845599"
+                <Label htmlFor="address">Alamat Lengkap *</Label>
+                <Textarea
+                  id="address"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  placeholder="Contoh: Jl. Cempaka No. 123, Jakarta Selatan"
+                  className="min-h-[100px]"
+                  required
                 />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="latitude">Latitude *</Label>
+                  <Input
+                    id="latitude"
+                    name="latitude"
+                    type="number"
+                    step="any"
+                    value={formData.latitude}
+                    onChange={handleInputChange}
+                    placeholder="Contoh: -6.2088"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="longitude">Longitude *</Label>
+                  <Input
+                    id="longitude"
+                    name="longitude"
+                    type="number"
+                    step="any"
+                    value={formData.longitude}
+                    onChange={handleInputChange}
+                    placeholder="Contoh: 106.8456"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <Label htmlFor="is_active" className="flex flex-col space-y-1">
+                  <span>Status Lokasi</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {formData.is_active ? 'Lokasi aktif dan dapat dipilih' : 'Lokasi tidak aktif'}
+                  </span>
+                </Label>
+                <Switch
+                  id="is_active"
+                  checked={formData.is_active}
+                  onCheckedChange={handleSwitchChange}
+                />
+              </div>
+              <div className="text-xs text-muted-foreground mt-2">
+                <p>* Wajib diisi</p>
+              </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddLocation(false)}>
-              Batal
-            </Button>
-            <Button onClick={handleAddLocation}>Tambah</Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setIsDialogOpen(false);
+                  resetForm();
+                }}
+                disabled={isSubmitting}
+              >
+                Batal
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Menyimpan...
+                  </>
+                ) : currentLocation?.id ? 'Simpan Perubahan' : 'Tambah Lokasi'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
-      <div className="space-y-3">
-        {locations.filter(loc => loc.is_active).map((location) => (
-          <Card key={location.id}>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="font-semibold mb-1">{location.name}</h3>
-                  <p className="text-sm text-muted-foreground mb-2">{location.address}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {location.latitude}, {location.longitude}
-                  </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {locations.length === 0 ? (
+          <div className="col-span-full text-center py-12 border-2 border-dashed rounded-lg">
+            <MapPinOff className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-2 text-sm font-medium">Belum ada lokasi</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Mulai dengan menambahkan lokasi baru
+            </p>
+            <Button 
+              className="mt-4" 
+              onClick={() => {
+                resetForm();
+                setIsDialogOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Tambah Lokasi
+            </Button>
+          </div>
+        ) : (
+          locations.map((location) => (
+            <Card 
+              key={location.id} 
+              className={`hover:shadow-md transition-shadow ${
+                !location.is_active ? 'opacity-70' : ''
+              }`}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold">{location.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={location.is_active ? 'default' : 'secondary'} className="text-xs">
+                          {location.is_active ? 'Aktif' : 'Nonaktif'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{location.address}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <MapPinIcon className="h-3.5 w-3.5" />
+                      <span>{location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}</span>
+                    </div>
+                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => handleDeleteLocation(location.id)}
-                >
-                  Nonaktifkan
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                
+                <div className="mt-4 flex items-center justify-between pt-4 border-t">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(location)}
+                    >
+                      <Edit className="h-3.5 w-3.5 mr-1.5" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleStatus(location)}
+                      className={location.is_active ? 'text-destructive' : 'text-green-600'}
+                    >
+                      {location.is_active ? (
+                        <>
+                          <X className="h-3.5 w-3.5 mr-1.5" />
+                          Nonaktifkan
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-3.5 w-3.5 mr-1.5" />
+                          Aktifkan
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive/90"
+                    onClick={() => handleDelete(location.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
