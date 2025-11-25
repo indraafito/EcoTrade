@@ -10,17 +10,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { MapPin, Navigation, Search, Locate, X, AlertCircle } from "lucide-react";
+import {
+  MapPin,
+  Navigation,
+  Search,
+  Locate,
+  X,
+  AlertCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Alert,
-  AlertDescription,
-} from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // MAP
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Circle,
+  useMap,
+} from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -52,7 +63,7 @@ const UserIcon = L.divIcon({
   </div>`,
   iconSize: [28, 28],
   iconAnchor: [14, 14],
-  className: 'user-location-icon'
+  className: "user-location-icon",
 });
 
 const ActiveLocationIcon = L.divIcon({
@@ -74,7 +85,7 @@ const ActiveLocationIcon = L.divIcon({
   </div>`,
   iconSize: [32, 32],
   iconAnchor: [16, 32],
-  className: 'active-location-icon'
+  className: "active-location-icon",
 });
 
 const InactiveLocationIcon = L.divIcon({
@@ -98,13 +109,13 @@ const InactiveLocationIcon = L.divIcon({
   </div>`,
   iconSize: [32, 32],
   iconAnchor: [16, 32],
-  className: 'inactive-location-icon'
+  className: "inactive-location-icon",
 });
 
 // Component to recenter map and handle resize
 const RecenterMap = ({ center }: { center: { lat: number; lng: number } }) => {
   const map = useMap();
-  
+
   useEffect(() => {
     map.setView(center, 15);
   }, [center, map]);
@@ -113,12 +124,12 @@ const RecenterMap = ({ center }: { center: { lat: number; lng: number } }) => {
     const handleResize = () => {
       map.invalidateSize();
     };
-    
-    window.addEventListener('resize', handleResize);
+
+    window.addEventListener("resize", handleResize);
     // Initial resize
     setTimeout(() => map.invalidateSize(), 100);
-    
-    return () => window.removeEventListener('resize', handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
   }, [map]);
 
   return null;
@@ -128,13 +139,22 @@ const LocationPage = () => {
   const [locations, setLocations] = useState<Location[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<Location[]>([]);
   const [nearLocations, setNearLocations] = useState<Location[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
-  const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(
+    null
+  );
+  const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showLocationDialog, setShowLocationDialog] = useState(false);
-  const [locationPermission, setLocationPermission] = useState<"granted" | "denied" | "prompt">("prompt");
-  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationPermission, setLocationPermission] = useState<
+    "granted" | "denied" | "prompt"
+  >("prompt");
+  const [mapCenter, setMapCenter] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const mapRef = useRef<any>(null);
 
@@ -163,14 +183,16 @@ const LocationPage = () => {
   }, [searchQuery, locations]);
 
   const checkLocationPermission = async () => {
-    if ('permissions' in navigator) {
+    if ("permissions" in navigator) {
       try {
-        const result = await navigator.permissions.query({ name: 'geolocation' });
+        const result = await navigator.permissions.query({
+          name: "geolocation",
+        });
         setLocationPermission(result.state);
-        
-        if (result.state === 'granted') {
+
+        if (result.state === "granted") {
           getUserPosition();
-        } else if (result.state === 'prompt') {
+        } else if (result.state === "prompt") {
           setShowLocationDialog(true);
         }
       } catch (error) {
@@ -222,7 +244,12 @@ const LocationPage = () => {
     getUserPosition();
   };
 
-  const calcDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const calcDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ) => {
     const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -237,7 +264,7 @@ const LocationPage = () => {
 
   const computeNearestLocations = (lat: number, lng: number) => {
     const sorted = [...locations]
-      .filter(loc => loc.is_active)
+      .filter((loc) => loc.is_active)
       .map((loc) => ({
         ...loc,
         distance: calcDistance(lat, lng, loc.latitude, loc.longitude),
@@ -273,17 +300,21 @@ const LocationPage = () => {
       <div className="relative bg-gradient-to-br from-primary via-[#17a865] to-[#1DBF73] px-4 sm:px-6 pt-8 sm:pt-10 md:pt-12 pb-6 sm:pb-8 overflow-hidden">
         <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl" />
         <div className="absolute bottom-0 left-0 w-32 h-32 sm:w-48 sm:h-48 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/3 blur-2xl" />
-        
+
         <div className="relative z-10 max-w-7xl mx-auto">
           <div className="flex items-center gap-2 sm:gap-3 mb-2">
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
               <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-white">Lokasi EcoTrade</h1>
+              <h1 className="text-xl sm:text-2xl font-black text-white">
+                Lokasi EcoTrade
+              </h1>
             </div>
           </div>
-          <p className="text-white/90 text-xs sm:text-sm font-medium ml-12 sm:ml-15">Temukan tempat sampah terdekat</p>
+          <p className="text-white/90 text-xs sm:text-sm font-medium ml-12 sm:ml-15">
+            Temukan tempat sampah terdekat
+          </p>
         </div>
       </div>
 
@@ -310,7 +341,7 @@ const LocationPage = () => {
               <X className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground hover:text-foreground" />
             </button>
           )}
-          
+
           {/* SEARCH SUGGESTIONS DROPDOWN - Responsive */}
           {showSuggestions && searchQuery && filteredLocations.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-card/95 backdrop-blur-2xl rounded-xl sm:rounded-2xl shadow-2xl border border-white/20 overflow-hidden z-50 max-h-60 sm:max-h-64 overflow-y-auto">
@@ -324,27 +355,39 @@ const LocationPage = () => {
                     });
                     setSearchQuery(location.name);
                     setShowSuggestions(false);
-                    window.scrollTo({ top: 200, behavior: 'smooth' });
+                    window.scrollTo({ top: 200, behavior: "smooth" });
                     toast.success(`Menampilkan ${location.name}`);
                   }}
                   className="w-full px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 hover:bg-primary/5 transition-colors text-left border-b border-border/30 last:border-0"
                 >
-                  <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 ${
-                    location.is_active 
-                      ? "bg-gradient-to-br from-primary/20 to-[#1DBF73]/20" 
-                      : "bg-gradient-to-br from-red-500/20 to-red-600/20"
-                  }`}>
-                    <MapPin className={`w-4 h-4 sm:w-5 sm:h-5 ${location.is_active ? "text-primary" : "text-red-600"}`} />
+                  <div
+                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 ${
+                      location.is_active
+                        ? "bg-gradient-to-br from-primary/20 to-[#1DBF73]/20"
+                        : "bg-gradient-to-br from-red-500/20 to-red-600/20"
+                    }`}
+                  >
+                    <MapPin
+                      className={`w-4 h-4 sm:w-5 sm:h-5 ${
+                        location.is_active ? "text-primary" : "text-red-600"
+                      }`}
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-xs sm:text-sm text-foreground truncate">{location.name}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{location.address}</p>
+                    <p className="font-bold text-xs sm:text-sm text-foreground truncate">
+                      {location.name}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                      {location.address}
+                    </p>
                   </div>
-                  <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg font-semibold shrink-0 ${
-                    location.is_active
-                      ? "bg-green-500/10 text-green-600"
-                      : "bg-red-500/10 text-red-600"
-                  }`}>
+                  <span
+                    className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg font-semibold shrink-0 ${
+                      location.is_active
+                        ? "bg-green-500/10 text-green-600"
+                        : "bg-red-500/10 text-red-600"
+                    }`}
+                  >
                     {location.is_active ? "Aktif" : "Tutup"}
                   </span>
                 </button>
@@ -358,7 +401,9 @@ const LocationPage = () => {
           <Alert className="bg-card/80 backdrop-blur-xl border-white/20 shadow-lg">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <span className="text-xs sm:text-sm">Aktifkan lokasi untuk melihat tempat terdekat</span>
+              <span className="text-xs sm:text-sm">
+                Aktifkan lokasi untuk melihat tempat terdekat
+              </span>
               <Button
                 size="sm"
                 onClick={handleEnableLocation}
@@ -376,16 +421,16 @@ const LocationPage = () => {
           <MapContainer
             center={defaultCenter}
             zoom={15}
-            style={{ 
+            style={{
               height: "250px",
               width: "100%",
-              zIndex: 0
+              zIndex: 0,
             }}
             zoomControl={false}
             className="map-modern"
             ref={mapRef}
           >
-            <TileLayer 
+            <TileLayer
               url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
@@ -408,12 +453,12 @@ const LocationPage = () => {
                 <Circle
                   center={userPos}
                   radius={500}
-                  pathOptions={{ 
-                    color: "#1DBF73", 
+                  pathOptions={{
+                    color: "#1DBF73",
                     fillColor: "#1DBF73",
                     fillOpacity: 0.1,
                     weight: 2,
-                    dashArray: "5, 5"
+                    dashArray: "5, 5",
                   }}
                 />
               </>
@@ -427,29 +472,56 @@ const LocationPage = () => {
                 eventHandlers={{
                   click: () => {
                     setMapCenter({ lat: loc.latitude, lng: loc.longitude });
-                  }
+                  },
                 }}
               >
                 <Popup className="custom-popup" maxWidth={220}>
-                  <div style={{ padding: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                      <p style={{ fontWeight: '700', fontSize: '13px', flex: '1 1 auto', margin: 0, minWidth: 0 }}>{loc.name}</p>
+                  <div style={{ padding: "6px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        marginBottom: "6px",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontWeight: "700",
+                          fontSize: "13px",
+                          flex: "1 1 auto",
+                          margin: 0,
+                          minWidth: 0,
+                        }}
+                      >
+                        {loc.name}
+                      </p>
                       <span
                         style={{
-                          display: 'inline-block',
-                          padding: '3px 6px',
-                          borderRadius: '6px',
-                          fontSize: '10px',
-                          fontWeight: '600',
-                          backgroundColor: loc.is_active ? '#dcfce7' : '#fee2e2',
-                          color: loc.is_active ? '#15803d' : '#991b1b',
-                          whiteSpace: 'nowrap'
+                          display: "inline-block",
+                          padding: "3px 6px",
+                          borderRadius: "6px",
+                          fontSize: "10px",
+                          fontWeight: "600",
+                          backgroundColor: loc.is_active
+                            ? "#dcfce7"
+                            : "#fee2e2",
+                          color: loc.is_active ? "#15803d" : "#991b1b",
+                          whiteSpace: "nowrap",
                         }}
                       >
                         {loc.is_active ? "✓ Aktif" : "✗ Tutup"}
                       </span>
                     </div>
-                    <p style={{ fontSize: '11px', color: '#666', marginBottom: '10px', lineHeight: '1.3' }}>
+                    <p
+                      style={{
+                        fontSize: "11px",
+                        color: "#666",
+                        marginBottom: "10px",
+                        lineHeight: "1.3",
+                      }}
+                    >
                       📍 {loc.address}
                     </p>
                     <button
@@ -458,27 +530,42 @@ const LocationPage = () => {
                         openInMaps(loc.latitude, loc.longitude);
                       }}
                       style={{
-                        width: '100%',
-                        padding: '7px 10px',
-                        background: 'linear-gradient(135deg, #1DBF73 0%, #17a865 100%)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '5px',
-                        boxShadow: '0 2px 6px rgba(29, 191, 115, 0.3)',
-                        transition: 'transform 0.2s'
+                        width: "100%",
+                        padding: "7px 10px",
+                        background:
+                          "linear-gradient(135deg, #1DBF73 0%, #17a865 100%)",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontWeight: "600",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "5px",
+                        boxShadow: "0 2px 6px rgba(29, 191, 115, 0.3)",
+                        transition: "transform 0.2s",
                       }}
-                      onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                      onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                      onMouseOver={(e) =>
+                        (e.currentTarget.style.transform = "scale(1.02)")
+                      }
+                      onMouseOut={(e) =>
+                        (e.currentTarget.style.transform = "scale(1)")
+                      }
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polygon points="3 11 22 2 13 21 11 13 3 11" />
                       </svg>
                       Buka Maps
                     </button>
@@ -515,7 +602,7 @@ const LocationPage = () => {
               height: 500px !important;
             }
           }
-          
+
           .map-modern .leaflet-popup-content-wrapper {
             background: rgba(255, 255, 255, 0.98);
             backdrop-filter: blur(10px);
@@ -540,7 +627,9 @@ const LocationPage = () => {
         {/* NEAREST LOCATIONS - Responsive Cards */}
         {userPos && nearLocations.length > 0 && (
           <div>
-            <h2 className="text-lg sm:text-xl font-bold text-foreground mb-3 sm:mb-4">5 Lokasi Terdekat</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-foreground mb-3 sm:mb-4">
+              5 Lokasi Terdekat
+            </h2>
 
             <div className="space-y-2.5 sm:space-y-3">
               {nearLocations.map((location) => (
@@ -552,7 +641,7 @@ const LocationPage = () => {
                       lat: location.latitude,
                       lng: location.longitude,
                     });
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    window.scrollTo({ top: 0, behavior: "smooth" });
                     toast.success(`Peta menuju ${location.name}`);
                   }}
                 >
@@ -563,7 +652,9 @@ const LocationPage = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-                          <p className="font-bold text-foreground text-sm sm:text-base truncate">{location.name}</p>
+                          <p className="font-bold text-foreground text-sm sm:text-base truncate">
+                            {location.name}
+                          </p>
                           <span className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 font-semibold shrink-0">
                             Aktif
                           </span>
@@ -598,7 +689,9 @@ const LocationPage = () => {
             {filteredLocations.length === 0 ? (
               <div className="text-center py-10 sm:py-12 bg-card/50 backdrop-blur-xl rounded-2xl sm:rounded-3xl border border-white/20">
                 <MapPin className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-2 sm:mb-3 text-muted-foreground/30" />
-                <p className="text-sm sm:text-base text-muted-foreground font-medium">Tidak ada lokasi ditemukan</p>
+                <p className="text-sm sm:text-base text-muted-foreground font-medium">
+                  Tidak ada lokasi ditemukan
+                </p>
               </div>
             ) : (
               <div className="space-y-2.5 sm:space-y-3">
@@ -610,23 +703,33 @@ const LocationPage = () => {
                   >
                     <CardContent className="p-3 sm:p-4">
                       <div className="flex items-start gap-2.5 sm:gap-3">
-                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 ${
-                          location.is_active 
-                            ? "bg-gradient-to-br from-green-500/20 to-green-600/20" 
-                            : "bg-gradient-to-br from-red-500/20 to-red-600/20"
-                        }`}>
-                          <MapPin className={`w-5 h-5 sm:w-6 sm:h-6 ${location.is_active ? "text-green-600" : "text-red-600"}`} />
+                        <div
+                          className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 ${
+                            location.is_active
+                              ? "bg-gradient-to-br from-green-500/20 to-green-600/20"
+                              : "bg-gradient-to-br from-red-500/20 to-red-600/20"
+                          }`}
+                        >
+                          <MapPin
+                            className={`w-5 h-5 sm:w-6 sm:h-6 ${
+                              location.is_active
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
                             <p className="font-bold text-foreground text-sm sm:text-base truncate">
                               {location.name}
                             </p>
-                            <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-semibold shrink-0 ${
-                              location.is_active
-                                ? "bg-green-500/10 text-green-600"
-                                : "bg-red-500/10 text-red-600"
-                            }`}>
+                            <span
+                              className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-semibold shrink-0 ${
+                                location.is_active
+                                  ? "bg-green-500/10 text-green-600"
+                                  : "bg-red-500/10 text-red-600"
+                              }`}
+                            >
                               {location.is_active ? "Aktif" : "Tutup"}
                             </span>
                           </div>
@@ -648,9 +751,12 @@ const LocationPage = () => {
       <Dialog open={showLocationDialog} onOpenChange={setShowLocationDialog}>
         <DialogContent className="bg-card/95 backdrop-blur-2xl border-white/20 w-[calc(100%-2rem)] sm:w-full max-w-md mx-auto rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl font-bold">Izinkan Akses Lokasi</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl font-bold">
+              Izinkan Akses Lokasi
+            </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
-              Aplikasi memerlukan akses lokasi untuk menampilkan tempat sampah terdekat dari Anda
+              Aplikasi memerlukan akses lokasi untuk menampilkan tempat sampah
+              terdekat dari Anda
             </DialogDescription>
           </DialogHeader>
 
@@ -658,7 +764,8 @@ const LocationPage = () => {
             <div className="bg-primary/5 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center border border-primary/10">
               <MapPin className="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-primary mb-2 sm:mb-3" />
               <p className="text-xs sm:text-sm text-muted-foreground">
-                Kami akan menggunakan lokasi Anda untuk menampilkan tempat-tempat terdekat
+                Kami akan menggunakan lokasi Anda untuk menampilkan
+                tempat-tempat terdekat
               </p>
             </div>
 
@@ -666,12 +773,13 @@ const LocationPage = () => {
               <Button
                 variant="outline"
                 onClick={() => setShowLocationDialog(false)}
-                className="flex-1 text-sm h-10 sm:h-11"
+                className="flex-1 text-sm h-10 sm:h-11 bg-white/5 hover:bg-white/10 border-white/20 text-foreground"
               >
                 Nanti Saja
               </Button>
-              <Button 
-                onClick={handleEnableLocation} 
+
+              <Button
+                onClick={handleEnableLocation}
                 className="flex-1 bg-primary hover:bg-primary/90 text-sm h-10 sm:h-11"
               >
                 <Locate className="w-4 h-4 mr-2" /> Izinkan
@@ -681,16 +789,23 @@ const LocationPage = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!selectedLocation} onOpenChange={() => setSelectedLocation(null)}>
+      <Dialog
+        open={!!selectedLocation}
+        onOpenChange={() => setSelectedLocation(null)}
+      >
         <DialogContent className="bg-card/95 backdrop-blur-2xl border-white/20 w-[calc(100%-2rem)] sm:w-full max-w-md mx-auto rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl font-bold flex-wrap">
-              <span className="flex-1 min-w-0 truncate">{selectedLocation?.name}</span>
-              <span className={`text-[10px] sm:text-xs px-2 py-1 rounded-full font-semibold shrink-0 ${
-                selectedLocation?.is_active
-                  ? "bg-green-500/10 text-green-600"
-                  : "bg-red-500/10 text-red-600"
-              }`}>
+              <span className="flex-1 min-w-0 truncate">
+                {selectedLocation?.name}
+              </span>
+              <span
+                className={`text-[10px] sm:text-xs px-2 py-1 rounded-full font-semibold shrink-0 ${
+                  selectedLocation?.is_active
+                    ? "bg-green-500/10 text-green-600"
+                    : "bg-red-500/10 text-red-600"
+                }`}
+              >
                 {selectedLocation?.is_active ? "Aktif" : "Tidak Aktif"}
               </span>
             </DialogTitle>
@@ -701,7 +816,9 @@ const LocationPage = () => {
 
           <div className="space-y-2.5 sm:space-y-3">
             <div className="bg-muted/30 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-border/50">
-              <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 font-semibold">Koordinat</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 font-semibold">
+                Koordinat
+              </p>
               <p className="font-mono text-xs sm:text-sm font-medium break-all">
                 {selectedLocation?.latitude}, {selectedLocation?.longitude}
               </p>
@@ -709,14 +826,17 @@ const LocationPage = () => {
 
             {userPos && selectedLocation && (
               <div className="bg-primary/5 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-primary/10">
-                <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 font-semibold">Jarak dari Anda</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 font-semibold">
+                  Jarak dari Anda
+                </p>
                 <p className="font-black text-xl sm:text-2xl text-primary">
                   {calcDistance(
                     userPos.lat,
                     userPos.lng,
                     selectedLocation.latitude,
                     selectedLocation.longitude
-                  ).toFixed(2)} km
+                  ).toFixed(2)}{" "}
+                  km
                 </p>
               </div>
             )}
@@ -731,7 +851,7 @@ const LocationPage = () => {
                       lng: selectedLocation.longitude,
                     });
                     setSelectedLocation(null);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    window.scrollTo({ top: 0, behavior: "smooth" });
                     toast.success("Peta dipusatkan ke lokasi ini");
                   }
                 }}
@@ -742,7 +862,10 @@ const LocationPage = () => {
               <Button
                 onClick={() =>
                   selectedLocation &&
-                  openInMaps(selectedLocation.latitude, selectedLocation.longitude)
+                  openInMaps(
+                    selectedLocation.latitude,
+                    selectedLocation.longitude
+                  )
                 }
                 className="flex-1 bg-primary hover:bg-primary/90 text-sm h-10 sm:h-11"
               >

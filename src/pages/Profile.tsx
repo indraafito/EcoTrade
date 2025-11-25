@@ -695,11 +695,11 @@ const ProfilePage = () => {
             <div className="bg-card/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-border/50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  {/* <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                     <Globe className="w-5 h-5 text-primary" />
                   </div>
                   <span className="font-semibold text-foreground">Bahasa</span>
-                </div>
+                </div> */}
                 <span className="text-muted-foreground font-medium">Indonesia</span>
               </div>
             </div>
