@@ -151,8 +151,17 @@ const ScanPage = () => {
     const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
     console.log('📸 Camera permission state:', result.state);
     
+    // Allow 'prompt' state - user can still grant permission
+    if (result.state === 'denied') {
+      setErrorMessage("Izin kamera ditolak. Silakan berikan izin kamera di pengaturan browser Anda.");
+      setShowErrorDialog(true);
+      setHasPermission(false);
+      return false;
+    }
+    
+    // For 'granted' or 'prompt' state, try to access camera
     setHasPermission(result.state === 'granted');
-    return result.state === 'granted';
+    return true; // Allow camera access attempt
   } catch (error) {
     console.error('Error checking camera permission:', error);
     // Fallback: try to access camera directly
@@ -166,7 +175,7 @@ const ScanPage = () => {
       return true;
     } catch (fallbackError) {
       console.error('Camera access denied:', fallbackError);
-      setErrorMessage("Aplikasi membutuhkan izin kamera untuk memindai QR Code. Silakan berikan izin kamera di pengaturan browser dan pastikan menggunakan koneksi HTTPS.");
+      setErrorMessage("Aplikasi membutuhkan izin kamera untuk memandai QR Code. Silakan berikan izin kamera di pengaturan browser dan pastikan menggunakan koneksi HTTPS.");
       setShowErrorDialog(true);
       return false;
     }
