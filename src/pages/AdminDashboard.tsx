@@ -7,10 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Gift, MapPin, Users, Recycle, LogOut, Activity, Calendar } from "lucide-react";
+import { Gift, MapPin, Users, Recycle, LogOut, Activity, Calendar, Target, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import LocationManagement from "@/components/Admin/LocationManagement";
 import VoucherManagement from "@/components/Admin/VoucherManagement";
+import MissionManagement from "@/components/Admin/MissionManagement";
+import RankingTiersManagement from "@/components/Admin/RankingTiersManagement";
 import BottleChart from "@/components/Admin/BottleChart";
 import UserRegistrationChart from "@/components/Admin/UserRegistrationChart";
 import AIAnalytics from "@/components/Admin/AIAnalytics";
@@ -85,14 +87,14 @@ const AdminDashboard = () => {
       const [
         bottlesRes, 
         usersRes, 
-        activeUsersRes,
+        recentActivitiesRes,
         redemptionsRes, 
         locationsRes,
         vouchersRes
       ] = await Promise.all([
         supabase.from("activities").select("bottles_count"),
         supabase.from("profiles").select("id", { count: "exact" }),
-        supabase.from("profiles").select("id", { count: "exact" }).eq("is_active", true),
+        supabase.from("activities").select("user_id", { count: "exact" }).gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
         supabase.from("voucher_redemptions").select("id", { count: "exact" }),
         supabase.from("locations").select("id", { count: "exact" }).eq("is_active", true),
         supabase.from("vouchers").select("id", { count: "exact" }).eq("is_active", true)
@@ -103,7 +105,7 @@ const AdminDashboard = () => {
       setStats({
         totalBottles,
         totalUsers: usersRes.count || 0,
-        totalActiveUsers: activeUsersRes.count || 0,
+        totalActiveUsers: recentActivitiesRes.count || 0,
         totalRedemptions: redemptionsRes.count || 0,
         totalLocations: locationsRes.count || 0,
         totalVouchers: vouchersRes.count || 0
@@ -367,6 +369,14 @@ const AdminDashboard = () => {
               <MapPin className="h-4 w-4" />
               <span>Lokasi</span>
             </TabsTrigger>
+            <TabsTrigger value="missions" className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              <span>Misi</span>
+            </TabsTrigger>
+            <TabsTrigger value="rankings" className="flex items-center gap-2">
+              <Trophy className="h-4 w-4" />
+              <span>Ranking</span>
+            </TabsTrigger>
             <TabsTrigger value="vouchers" className="flex items-center gap-2">
               <Gift className="h-4 w-4" />
               <span>Voucher</span>
@@ -379,6 +389,14 @@ const AdminDashboard = () => {
 
           <TabsContent value="locations" className="mt-6">
             <LocationManagement onLocationChange={refreshData} />
+          </TabsContent>
+
+          <TabsContent value="missions" className="mt-6">
+            <MissionManagement onMissionChange={refreshData} />
+          </TabsContent>
+
+          <TabsContent value="rankings" className="mt-6">
+            <RankingTiersManagement onRankingTiersChange={refreshData} />
           </TabsContent>
 
           <TabsContent value="vouchers" className="mt-6">

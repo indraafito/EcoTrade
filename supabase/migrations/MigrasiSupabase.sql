@@ -802,4 +802,33 @@ TO authenticated
 USING (public.has_role(auth.uid(), 'admin'));
 
 -- ============================================
+-- SAMPLE MISSION DATA
+-- ============================================
+
+-- Insert sample missions
+INSERT INTO public.missions (title, description, target_type, target_value, points_bonus, mission_type, difficulty, duration_hours, icon, is_active, max_completions) VALUES
+('Eco Warrior', 'Kumpulkan 10 botol untuk membantu lingkungan', 'bottles', 10, 50, 'daily', 'easy', 24, '🎯', true, 1),
+('Point Master', 'Dapatkan 100 poin dari aktivitas recycling', 'points', 100, 25, 'daily', 'medium', 24, '⭐', true, 1),
+('Weight Champion', 'Kumpulkan total 1kg berat botol', 'weight_kg', 1, 75, 'daily', 'medium', 24, '⚖️', true, 1),
+('Weekly Streak', 'Lakukan recycling selama 7 hari berturut-turut', 'activities', 7, 100, 'weekly', 'hard', 168, '🔥', true, 1),
+('Friend Referral', 'Ajak 3 teman untuk bergabung dengan EcoTrade', 'activities', 3, 150, 'special', 'medium', 72, '👥', true, 3),
+('Monthly Hero', 'Kumpulkan 50 botol dalam sebulan', 'bottles', 50, 200, 'monthly', 'hard', 720, '🏆', true, 1),
+('Green Starter', 'Lakukan recycling pertama kali', 'activities', 1, 10, 'daily', 'easy', 24, '🌱', true, 1),
+('Heavy Lifter', 'Kumpulkan 5kg berat botol', 'weight_kg', 5, 125, 'weekly', 'medium', 168, '💪', true, 2)
+ON CONFLICT DO NOTHING;
+
+-- ============================================
+-- SAMPLE RANKING TIERS DATA
+-- ============================================
+
+-- Insert sample ranking tiers (already exists in migration, but ensuring complete data)
+INSERT INTO public.ranking_tiers (name, threshold_points, bonus_points, sort_order, is_active) VALUES
+('Diamond', 5000, 300, 1, true),
+('Platinum', 3000, 200, 2, true),
+('Gold', 1500, 100, 3, true),
+('Silver', 500, 50, 4, true),
+('Bronze', 0, 0, 5, true)
+ON CONFLICT DO NOTHING;
+
+-- ============================================
 -- MIGRATION
