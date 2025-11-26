@@ -26,7 +26,7 @@ const UserRegistrationChart: React.FC<UserRegistrationChartProps> = ({
 }) => {
   return (
     <div>
-      <div className="h-64 flex items-center justify-center bg-muted rounded-lg relative overflow-hidden border">
+      <div className="h-64 flex items-center justify-center bg-muted rounded-lg relative border pt-16">
         {/* Line Chart */}
         <div className="absolute inset-0 p-4">
           <svg className="w-full h-full" viewBox="0 0 400 240">
@@ -72,7 +72,7 @@ const UserRegistrationChart: React.FC<UserRegistrationChartProps> = ({
                   const maxY = Math.max(...getRegistrationYAxisLabels());
                   const y = 220 - ((data.registrations / maxY) * 180);
                   return (
-                    <g key={index}>
+                    <g key={index} className="group cursor-pointer">
                       <circle
                         cx={x}
                         cy={y}
@@ -81,12 +81,34 @@ const UserRegistrationChart: React.FC<UserRegistrationChartProps> = ({
                         className="text-green-600 cursor-pointer hover:r-8 transition-all"
                       />
                       {/* Hover Tooltip */}
-                      <foreignObject x={x - 60} y={y - 40} width="120" height="35" className="pointer-events-none">
-                        <div className="bg-background border rounded p-2 text-xs opacity-0 hover:opacity-100 transition-opacity">
-                          <p className="font-medium">{data.label}</p>
-                          <p>{data.registrations} pendaftar</p>
-                        </div>
-                      </foreignObject>
+                      <g className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                        {(() => {
+                          const labelWidth = data.label.length * 6 + 20;
+                          const valueWidth = `${data.registrations} pendaftar`.length * 6 + 20;
+                          const tooltipWidth = Math.max(labelWidth, valueWidth, 100);
+                          const tooltipX = x < 200 ? x + 5 : x - tooltipWidth - 5;
+                          
+                          return (
+                            <>
+                              <rect 
+                                x={tooltipX} 
+                                y={y - 30} 
+                                width={tooltipWidth} 
+                                height="50" 
+                                rx="6"
+                                className="fill-background stroke-border"
+                                strokeWidth="1"
+                              />
+                              <text x={tooltipX + 10} y={y - 14} className="text-xs fill-foreground font-medium">
+                                {data.label}
+                              </text>
+                              <text x={tooltipX + 10} y={y + 4} className="text-sm fill-green-600 font-bold">
+                                {data.registrations} pendaftar
+                              </text>
+                            </>
+                          );
+                        })()}
+                      </g>
                     </g>
                   );
                 })}
@@ -101,7 +123,7 @@ const UserRegistrationChart: React.FC<UserRegistrationChartProps> = ({
                 const y = 220 - barHeight;
                 
                 return (
-                  <g key={index}>
+                  <g key={index} className="group cursor-pointer">
                     {/* Bar Rectangle */}
                     <rect
                       x={x - barWidth/2}
@@ -115,12 +137,34 @@ const UserRegistrationChart: React.FC<UserRegistrationChartProps> = ({
                     />
                     
                     {/* Hover Tooltip */}
-                    <foreignObject x={x - 60} y={y - 40} width="120" height="35" className="pointer-events-none">
-                      <div className="bg-background border rounded p-2 text-xs opacity-0 hover:opacity-100 transition-opacity">
-                        <p className="font-medium">{data.label}</p>
-                        <p>{data.registrations} pendaftar</p>
-                      </div>
-                    </foreignObject>
+                    <g className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                      {(() => {
+                        const labelWidth = data.label.length * 6 + 20;
+                        const valueWidth = `${data.registrations} pendaftar`.length * 6 + 20;
+                        const tooltipWidth = Math.max(labelWidth, valueWidth, 100);
+                        const tooltipX = x < 200 ? x + 5 : x - tooltipWidth - 5;
+                        
+                        return (
+                          <>
+                            <rect 
+                              x={tooltipX} 
+                              y={y - 30} 
+                              width={tooltipWidth} 
+                              height="50" 
+                              rx="6"
+                              className="fill-background stroke-border"
+                              strokeWidth="1"
+                            />
+                            <text x={tooltipX + 10} y={y - 14} className="text-xs fill-foreground font-medium">
+                              {data.label}
+                            </text>
+                            <text x={tooltipX + 10} y={y + 4} className="text-sm fill-green-600 font-bold">
+                              {data.registrations} pendaftar
+                            </text>
+                          </>
+                        );
+                      })()}
+                    </g>
                   </g>
                 );
               })
