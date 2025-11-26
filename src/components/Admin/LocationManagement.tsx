@@ -21,11 +21,14 @@ import {
   Check, 
   X,
   MapPinOff,
-  MapPin as MapPinIcon
+  MapPin as MapPinIcon,
+  QrCode,
+  Download
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { generateLocationQRCodeAPI, saveLocationQRCode } from "@/lib/qr-generator";
 
 interface Location {
   id: string;
@@ -35,6 +38,7 @@ interface Location {
   longitude: number;
   is_active: boolean;
   created_at: string;
+  qr_code_url?: string; // Add QR code URL
 }
 
 interface LocationManagementProps {
@@ -47,6 +51,8 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<Partial<Location> | null>(null);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [selectedQRLocation, setSelectedQRLocation] = useState<Location | null>(null);
   const [formData, setFormData] = useState<Omit<Location, 'id' | 'created_at'>>({ 
     name: '',
     address: '',
@@ -61,13 +67,25 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
 
   const fetchLocations = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("locations")
-        .select("*")
+        .select(`
+          *,
+          location_qr_codes (
+            qr_code_url
+          )
+        `)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setLocations(data || []);
+      
+      // Flatten QR code URL into location object
+      const locationsWithQR = (data || []).map((location: any) => ({
+        ...location,
+        qr_code_url: location.location_qr_codes?.[0]?.qr_code_url || null
+      }));
+      
+      setLocations(locationsWithQR);
       if (onLocationChange) onLocationChange();
     } catch (error: any) {
       toast.error("Gagal memuat data lokasi: " + error.message);
@@ -150,6 +168,95 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
     }
   };
 
+  const showQRCode = async (location: Location) => {
+    try {
+      // Check if QR code already exists
+      if (location.qr_code_url) {
+        // QR code already exists, just show dialog
+        setSelectedQRLocation(location);
+        setQrDialogOpen(true);
+        return;
+      }
+
+      // Set selected location immediately for UI feedback
+      setSelectedQRLocation(location);
+      setQrDialogOpen(true);
+      
+      // Generate QR code in background if not exists
+      if (!location.qr_code_url) {
+        // Show loading state in dialog
+        const updatedLocation = { ...location, qr_code_url: null };
+        setSelectedQRLocation(updatedLocation);
+        
+        try {
+          // Generate QR code
+          const qrCodeUrl = await generateLocationQRCodeAPI({
+            id: location.id,
+            name: location.name
+          });
+          
+          // Save to database with upsert (will handle duplicates gracefully)
+          const result = await saveLocationQRCode(location.id, qrCodeUrl);
+          
+          if (result.success) {
+            // Update dialog with QR code
+            const finalLocation = { ...location, qr_code_url: qrCodeUrl };
+            setSelectedQRLocation(finalLocation);
+            fetchLocations(); // Refresh list
+            
+            // Only show toast if QR is newly created
+            if (result.isNew) {
+              toast.success('QR Code berhasil dibuat');
+            }
+          } else {
+            // Check if QR code already exists in database
+            const { data: existingQR } = await (supabase as any)
+              .from('location_qr_codes')
+              .select('qr_code_url')
+              .eq('location_id', location.id)
+              .single();
+            
+            if (existingQR) {
+              // QR code exists, update UI
+              const finalLocation = { ...location, qr_code_url: existingQR.qr_code_url };
+              setSelectedQRLocation(finalLocation);
+              fetchLocations(); // Refresh list
+              // Tidak perlu toast karena QR sudah ada di database
+            } else {
+              toast.error('QR Code gagal disimpan');
+            }
+          }
+        } catch (error) {
+          console.error('Error generating QR:', error);
+          toast.error('Gagal membuat QR Code');
+        }
+      }
+    } catch (error: any) {
+      toast.error('Gagal menampilkan QR Code: ' + error.message);
+    }
+  };
+
+  const downloadQRCode = (location: Location) => {
+    try {
+      if (!location.qr_code_url) {
+        toast.error('QR Code belum tersedia');
+        return;
+      }
+
+      // Download existing QR code
+      const link = document.createElement('a');
+      link.href = location.qr_code_url;
+      link.download = `qr-code-${location.name.replace(/\s+/g, '-').toLowerCase()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success('QR Code berhasil diunduh');
+    } catch (error: any) {
+      toast.error('Gagal mengunduh QR Code: ' + error.message);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -166,12 +273,42 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
         toast.success('Lokasi berhasil diperbarui');
       } else {
         // Create new location
-        const { error } = await supabase
-          .from('locations')
-          .insert([formData]);
+        const { data, error } = await supabase
+          .from("locations")
+          .insert([formData])
+          .select()
+          .single();
 
         if (error) throw error;
-        toast.success('Lokasi berhasil ditambahkan');
+        
+        // Auto-generate QR code for new location
+        if (data && data.id) {
+          try {
+            console.log('Generating QR code for new location:', data);
+            
+            // Generate QR code URL
+            const qrCodeUrl = await generateLocationQRCodeAPI({
+              id: data.id,
+              name: data.name
+            });
+            
+            console.log('QR code generated:', qrCodeUrl);
+            
+            // Save QR code to database
+            const saved = await saveLocationQRCode(data.id, qrCodeUrl);
+            
+            if (saved) {
+              toast.success('Lokasi dan QR Code berhasil ditambahkan');
+            } else {
+              toast.success('Lokasi berhasil ditambahkan (QR Code gagal disimpan)');
+            }
+          } catch (qrError) {
+            console.error('Error generating QR code:', qrError);
+            toast.success('Lokasi berhasil ditambahkan (QR Code gagal dibuat)');
+          }
+        } else {
+          toast.success('Lokasi berhasil ditambahkan');
+        }
       }
 
       setIsDialogOpen(false);
@@ -362,6 +499,15 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
                       <span>{location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}</span>
                     </div>
                   </div>
+                  {location.qr_code_url && (
+                    <div className="ml-4">
+                      <img 
+                        src={location.qr_code_url} 
+                        alt={`QR Code ${location.name}`}
+                        className="w-16 h-16 border rounded"
+                      />
+                    </div>
+                  )}
                 </div>
                 
                 <div className="mt-4 flex items-center justify-between pt-4 border-t">
@@ -373,6 +519,14 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
                     >
                       <Edit className="h-3.5 w-3.5 mr-1.5" />
                       Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => showQRCode(location)}
+                    >
+                      <QrCode className="h-3.5 w-3.5 mr-1.5" />
+                      QR
                     </Button>
                     <Button
                       variant="outline"
@@ -407,6 +561,71 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
           ))
         )}
       </div>
+
+      {/* QR Code Dialog */}
+      <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="w-5 h-5" />
+              QR Code Lokasi
+            </DialogTitle>
+            <DialogDescription>
+              QR Code untuk {selectedQRLocation?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedQRLocation && (
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                {selectedQRLocation.qr_code_url ? (
+                  <img 
+                    src={selectedQRLocation.qr_code_url} 
+                    alt={`QR Code ${selectedQRLocation.name}`}
+                    className="w-64 h-64 border-2 border-gray-200 rounded-lg"
+                    onLoad={() => console.log('QR Code loaded successfully')}
+                    onError={() => console.error('QR Code failed to load')}
+                  />
+                ) : (
+                  <div className="w-64 h-64 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                    <div className="text-center space-y-2">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                      <p className="text-sm text-gray-500">Membuat QR Code...</p>
+                      <p className="text-xs text-gray-400">Mohon tunggu sebentar</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="space-y-2 text-center">
+                <h3 className="font-semibold">{selectedQRLocation.name}</h3>
+                <p className="text-sm text-muted-foreground">{selectedQRLocation.address}</p>
+                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                  <MapPinIcon className="h-3 w-3" />
+                  <span>{selectedQRLocation.latitude.toFixed(6)}, {selectedQRLocation.longitude.toFixed(6)}</span>
+                </div>
+              </div>
+              
+              <DialogFooter className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => downloadQRCode(selectedQRLocation)}
+                  className="flex-1"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Unduh QR Code
+                </Button>
+                <Button
+                  onClick={() => setQrDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Tutup
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
