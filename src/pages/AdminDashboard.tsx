@@ -11,7 +11,9 @@ import { Gift, MapPin, Users, Recycle, LogOut, UserCog, Settings, Activity, Cale
 import { toast } from "sonner";
 import LocationManagement from "@/components/Admin/LocationManagement";
 import VoucherManagement from "@/components/Admin/VoucherManagement";
+import RegistrationChart from "@/components/Admin/RegistrationChart";
 import { Badge } from "@/components/ui/badge";
+import { getRegistrationYAxisLabels, formatDate, ChartData } from "@/components/Admin/ChartUtils";
 
 interface Stats {
   totalBottles: number;
@@ -39,11 +41,16 @@ const AdminDashboard = () => {
     endDate: new Date()
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [chartData, setChartData] = useState<ChartData[]>([]);
 
   useEffect(() => {
     checkAdminAccess();
     fetchStats();
   }, []);
+  
+  useEffect(() => {
+    fetchChartData();
+  }, [dateFilter]);
 
   const checkAdminAccess = async () => {
     try {
@@ -146,26 +153,99 @@ const AdminDashboard = () => {
     setShowDatePicker(false);
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('id-ID', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
+
+  const fetchChartData = async () => {
+    try {
+      // Fetch user registrations by date
+      const { data: registrations, error } = await supabase
+        .from('profiles')
+        .select('created_at')
+        .gte('created_at', dateFilter.startDate.toISOString())
+        .lte('created_at', dateFilter.endDate.toISOString())
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      
+      // Fetch activities (bottle collections) by date
+      const { data: collections, error: collectionError } = await supabase
+        .from('activities')
+        .select('created_at, bottles_count')
+        .gte('created_at', dateFilter.startDate.toISOString())
+        .lte('created_at', dateFilter.endDate.toISOString())
+        .order('created_at', { ascending: true });
+      
+      if (collectionError) throw collectionError;
+      
+      // Process data for charts
+      const processedData = processChartData(registrations || [], collections || []);
+      setChartData(processedData);
+    } catch (error) {
+      console.error('Error fetching chart data:', error);
+      // Fallback to sample data
+      setChartData(getSampleChartData());
+    }
+  };
+  
+  const processChartData = (registrations: any[], collections: any[]) => {
+    const dataPoints = getDataPointsCount();
+    const labels = getChartLabels();
+    
+    return labels.map((label, index) => {
+      const dateRange = getDateRangeForIndex(index);
+      
+      // Count registrations in this date range
+      const registrationCount = registrations.filter(reg => {
+        const regDate = new Date(reg.created_at);
+        return regDate >= dateRange.start && regDate < dateRange.end;
+      }).length;
+      
+      // Sum bottle collections in this date range
+      const bottleCount = collections
+        .filter(col => {
+          const colDate = new Date(col.created_at);
+          return colDate >= dateRange.start && colDate < dateRange.end;
+        })
+        .reduce((sum, col) => sum + (col.bottles_count || 1), 0);
+      
+      return {
+        label,
+        registrations: registrationCount,
+        bottles: bottleCount,
+        date: dateRange.start
+      };
     });
   };
-
-  const getChartData = () => {
-    // Generate sample data based on date filter
-    const dataPoints = dateFilter.type === 'day' ? 24 : // hours
-                      dateFilter.type === 'week' ? 7 : // days
-                      dateFilter.type === 'month' ? 30 : // days
-                      12; // months
+  
+  const getDataPointsCount = () => {
+    return dateFilter.type === 'day' ? 24 :
+           dateFilter.type === 'week' ? 7 :
+           dateFilter.type === 'month' ? 30 :
+           12;
+  };
+  
+  const getDateRangeForIndex = (index: number) => {
+    const start = new Date(dateFilter.startDate);
+    const end = new Date(dateFilter.endDate);
+    const totalMs = end.getTime() - start.getTime();
     
-    return Array.from({ length: dataPoints }, (_, i) => {
-      const baseValue = stats.totalBottles / dataPoints;
-      const randomVariation = Math.random() * baseValue * 0.5;
-      return Math.floor(baseValue + randomVariation);
-    });
+    const intervalMs = totalMs / getDataPointsCount();
+    const rangeStart = new Date(start.getTime() + (index * intervalMs));
+    const rangeEnd = new Date(start.getTime() + ((index + 1) * intervalMs));
+    
+    return { start: rangeStart, end: rangeEnd };
+  };
+  
+  
+  const getSampleChartData = () => {
+    const dataPoints = getDataPointsCount();
+    const labels = getChartLabels();
+    
+    return labels.map((label, index) => ({
+      label,
+      registrations: Math.floor(Math.random() * 10) + 1,
+      bottles: Math.floor(Math.random() * 50) + 10,
+      date: new Date(dateFilter.startDate.getTime() + (index * 24 * 60 * 60 * 1000))
+    }));
   };
 
   const getChartLabels = () => {
@@ -453,98 +533,14 @@ const AdminDashboard = () => {
                 </Dialog>
               )}
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Tren Botol Terkumpul</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {dateFilter.type === 'day' ? 'Per jam' :
-                       dateFilter.type === 'week' ? '7 hari terakhir' :
-                       dateFilter.type === 'month' ? '30 hari terakhir' : 
-                       dateFilter.type === 'year' ? 'Tahun ini' :
-                       `Custom: ${formatDate(dateFilter.startDate)} - ${formatDate(dateFilter.endDate)}`}
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-64 flex items-center justify-center bg-muted rounded-lg relative overflow-hidden">
-                      {/* Dynamic Bar Chart */}
-                      <div className="absolute inset-0 p-4">
-                        <div className="flex items-end justify-around h-full gap-1">
-                          {getChartData().map((height, index) => (
-                            <div key={index} className="flex-1 flex flex-col items-center">
-                              <div 
-                                className="w-full bg-gradient-to-t from-primary to-primary/60 rounded-t-md transition-all duration-500 hover:from-primary/80"
-                                style={{ height: `${Math.min((height / Math.max(...getChartData())) * 100, 100)}%` }}
-                              />
-                              {dateFilter.type !== 'day' && (
-                                <span className="text-xs mt-1 text-muted-foreground truncate">
-                                  {getChartLabels()[index]}
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Pendaftaran Pengguna</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {dateFilter.type === 'day' ? 'Hari ini' :
-                       dateFilter.type === 'week' ? '7 hari terakhir' :
-                       dateFilter.type === 'month' ? '30 hari terakhir' : 
-                       dateFilter.type === 'year' ? 'Tahun ini' :
-                       `Custom: ${formatDate(dateFilter.startDate)} - ${formatDate(dateFilter.endDate)}`}
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-64 flex items-center justify-center bg-muted rounded-lg relative overflow-hidden">
-                      {/* Dynamic Registration Chart */}
-                      <div className="relative w-32 h-32">
-                        <svg className="w-32 h-32 transform -rotate-90">
-                          <circle
-                            cx="64"
-                            cy="64"
-                            r="56"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="16"
-                            className="text-muted"
-                          />
-                          <circle
-                            cx="64"
-                            cy="64"
-                            r="56"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="16"
-                            strokeDasharray={`${Math.min((stats.totalUsers / Math.max(stats.totalUsers + 50, 1)) * 352, 352)} 352`}
-                            className="text-green-600 transition-all duration-500"
-                          />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="text-center">
-                            <p className="text-2xl font-bold">{stats.totalUsers}</p>
-                            <p className="text-xs text-muted-foreground">Total Daftar</p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="absolute bottom-4 left-4 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 bg-green-600 rounded-full"></div>
-                          <span className="text-sm">Terdaftar ({stats.totalUsers})</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 bg-muted rounded-full"></div>
-                          <span className="text-sm">Target (50)</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              <div className="space-y-4">
+                <RegistrationChart
+                  chartData={chartData}
+                  dateFilter={dateFilter}
+                  stats={stats}
+                  formatDate={formatDate}
+                  getRegistrationYAxisLabels={() => getRegistrationYAxisLabels(chartData)}
+                />
               </div>
             </div>
           </TabsContent>
