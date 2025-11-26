@@ -13,6 +13,7 @@ import LocationManagement from "@/components/Admin/LocationManagement";
 import VoucherManagement from "@/components/Admin/VoucherManagement";
 import BottleChart from "@/components/Admin/BottleChart";
 import UserRegistrationChart from "@/components/Admin/UserRegistrationChart";
+import AIAnalytics from "@/components/Admin/AIAnalytics";
 import { Badge } from "@/components/ui/badge";
 import { getRegistrationYAxisLabels, getBottleYAxisLabels, formatDate, ChartData } from "@/components/Admin/ChartUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -554,6 +555,16 @@ const AdminDashboard = () => {
                     chartType={chartType}
                   />
                 </div>
+              </div>
+
+              {/* AI Analytics Section */}
+              <div className="mt-8">
+                <AIAnalytics
+                  bottleData={chartData}
+                  userData={chartData}
+                  stats={stats}
+                  dateFilter={dateFilter}
+                />
               </div>
             </div>
           </TabsContent>
