@@ -428,12 +428,6 @@ const Home = () => {
               <p className="text-white/70 text-xs">Keep saving the planet!</p>
             </div>
           </div>
-          <button
-            onClick={() => navigate("/notifications")}
-            className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-lg hover:bg-white/30 transition-colors"
-          >
-            <Bell className="w-6 h-6 text-white" />
-          </button>
         </div>
       </div>
 
