@@ -60,6 +60,14 @@ interface Mission {
   duration_hours?: number;
 }
 
+interface MissionProgress {
+  user_id: string;
+  mission_id: string;
+  progress_value: number;
+  status: string;
+  started_at: string;
+}
+
 const Home = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -103,15 +111,8 @@ const Home = () => {
         .eq("user_id", user.id)
         .single();
 
-      const { count: voucherCount } = await supabase
-        .from("voucher_redemptions")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
-
-      const data = {
-        ...profileData,
-        total_vouchers: voucherCount || 0,
-      };
+      console.log('🔍 Raw profile data from database:', profileData);
+      console.log('🔍 Profile fetch error:', error);
 
       if (error) {
         if (error.code === "PGRST116") {
@@ -141,7 +142,10 @@ const Home = () => {
             ...newProfile,
             total_carbon_emission: 0,
             total_earnings: 0,
+            total_vouchers: 0,
           };
+
+          console.log('📊 Profile with defaults:', profileWithDefaults);
 
           setProfile(profileWithDefaults);
           toast.success("Profil berhasil dibuat!");
@@ -150,14 +154,66 @@ const Home = () => {
         throw error;
       }
 
-      const estimatedCarbonEmission = (data.total_weight_kg || 0) * 0.5;
-      const estimatedEarnings = (data.points || 0) * 10;
+      const { count: voucherCount } = await supabase
+        .from("voucher_redemptions")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      const estimatedCarbonEmission = (profileData.total_weight_kg || 0) * 0.5;
+      const estimatedEarnings = (profileData.points || 0) * 10;
+
+      // Auto-sync profile with activities if there's a discrepancy
+      const { data: activities, error: activitiesError } = await supabase
+        .from("activities")
+        .select("bottles_count, points_earned, weight_kg")
+        .eq("user_id", user.id);
+
+      if (!activitiesError && activities) {
+        const totalBottlesFromActivities = activities.reduce((sum, act) => sum + act.bottles_count, 0);
+        const totalPointsFromActivities = activities.reduce((sum, act) => sum + act.points_earned, 0);
+        const totalWeightFromActivities = activities.reduce((sum, act) => sum + act.weight_kg, 0);
+
+        console.log('🔍 Auto-sync check:');
+        console.log('  - Profile bottles:', profileData.total_bottles);
+        console.log('  - Activities bottles:', totalBottlesFromActivities);
+        console.log('  - Difference:', profileData.total_bottles - totalBottlesFromActivities);
+
+        // If there's a discrepancy, update profile
+        if (profileData.total_bottles !== totalBottlesFromActivities) {
+          console.log('🔧 Auto-syncing profile with activities...');
+          const { error: syncError } = await supabase
+            .from("profiles")
+            .update({
+              total_bottles: totalBottlesFromActivities,
+              points: totalPointsFromActivities,
+              total_weight_kg: totalWeightFromActivities,
+            })
+            .eq("user_id", user.id);
+
+          if (!syncError) {
+            console.log('✅ Profile synced successfully');
+            toast.success('🔧 Profile data telah disinkronkan dengan aktivitas');
+            profileData.total_bottles = totalBottlesFromActivities;
+            profileData.points = totalPointsFromActivities;
+            profileData.total_weight_kg = totalWeightFromActivities;
+          } else {
+            console.error('❌ Sync error:', syncError);
+          }
+        }
+      }
 
       const profileWithEstimates = {
-        ...data,
+        ...profileData,
         total_carbon_emission: estimatedCarbonEmission,
         total_earnings: estimatedEarnings,
+        total_vouchers: voucherCount || 0,
       };
+
+      console.log('📊 Profile with estimates:', profileWithEstimates);
+      console.log('🔍 Final check - Database vs Display:');
+      console.log('  - Database total_bottles:', profileData.total_bottles);
+      console.log('  - Display total_bottles:', profileWithEstimates.total_bottles);
+      console.log('  - Are they equal?', profileData.total_bottles === profileWithEstimates.total_bottles);
 
       setProfile(profileWithEstimates);
     } catch (error: any) {
@@ -211,7 +267,7 @@ const Home = () => {
 
       // Fetch active missions only
       const { data: allMissions, error: missionsError } = await supabase
-        .from("missions")
+        .from("missions" as any)
         .select("*")
         .eq("is_active", true)
         .order("difficulty", { ascending: true });
@@ -230,7 +286,7 @@ const Home = () => {
 
       // Fetch user's mission progress
       const { data: userProgress, error: progressError } = await supabase
-        .from("mission_progress")
+        .from("mission_progress" as any)
         .select("*")
         .eq("user_id", user.id)
         .in("status", ["in_progress", "completed"]);
@@ -244,16 +300,16 @@ const Home = () => {
         const initialMissions = allMissions.slice(0, 3);
         const now = new Date();
         
-        const progressToCreate = initialMissions.map((mission) => ({
+        const progressToCreate = initialMissions.map((mission: any) => ({
           user_id: user.id,
           mission_id: mission.id,
           progress_value: 0,
           status: "in_progress",
           started_at: now.toISOString(),
-        }));
+        } as MissionProgress));
 
         const { data: newProgress, error: createError } = await supabase
-          .from("mission_progress")
+          .from("mission_progress" as any)
           .insert(progressToCreate)
           .select();
 
@@ -261,7 +317,7 @@ const Home = () => {
           console.error("Error creating mission progress:", createError);
         }
 
-        const transformedMissions = initialMissions.map((m) => ({
+        const transformedMissions = initialMissions.map((m: any) => ({
           id: m.id,
           mission_id: m.id,
           mission_title: m.title,
@@ -288,8 +344,9 @@ const Home = () => {
 
       // Map missions with progress
       const missionsWithProgress = allMissions
-        .map((mission) => {
-          const progress = userProgress.find((p) => p.mission_id === mission.id);
+        .map((mission: any) => {
+          if (!userProgress || Array.isArray(userProgress) === false) return null;
+          const progress = (userProgress as any[]).find((p: any) => p.mission_id === mission.id);
           if (!progress) return null;
           if (progress.status === "claimed" || progress.status === "expired") return null;
 
@@ -336,7 +393,7 @@ const Home = () => {
 
       // Update mission progress to claimed
       const { error: updateError } = await supabase
-        .from("mission_progress")
+        .from("mission_progress" as any)
         .update({
           status: "claimed",
           claimed_at: new Date().toISOString(),

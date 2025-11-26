@@ -91,10 +91,42 @@ const ScanPage = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const scannerStartedRef = useRef(false); // Add flag to prevent multiple instances
+  const confirmDisposalRef = useRef(false); // Add flag to prevent double execution
 
   useEffect(() => {
     checkAuth();
   }, []);
+
+  const stopCamera = () => {
+    console.log('Stopping camera and scanning...');
+    
+    // Stop scanning first
+    setIsScanning(false);
+    
+    // Reset scanner flag
+    scannerStartedRef.current = false;
+    
+    // Stop animation frame
+    if (animationFrameRef.current) {
+      console.log('🛑 Stopping animation frame...');
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    
+    // Stop camera stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    
+    // Reset camera state
+    setCameraActive(false);
+    
+    console.log('Camera and scanning stopped');
+  };
 
   useEffect(() => {
     // Cleanup camera when component unmounts
@@ -250,53 +282,13 @@ const startCamera = async () => {
         console.error('Video ref is still null after timeout');
         setErrorMessage("Gagal menginisialisasi video kamera. Silakan refresh halaman dan coba lagi.");
         setShowErrorDialog(true);
-        stopCamera();
       }
-    }, 100); // Small delay to ensure DOM is updated
+    }, 1000); // Add timeout to ensure DOM update
   } catch (error: any) {
     console.error('Error starting camera:', error);
-    if (error.name === 'NotAllowedError') {
-      setErrorMessage("Izin kamera ditolak. Silakan berikan izin kamera untuk menggunakan fitur scan QR Code.");
-    } else if (error.name === 'NotFoundError') {
-      setErrorMessage("Tidak ada kamera yang ditemukan. Pastikan perangkat Anda memiliki kamera.");
-    } else if (error.name === 'NotReadableError') {
-      setErrorMessage("Kamera sedang digunakan oleh aplikasi lain. Silakan tutup aplikasi lain dan coba lagi.");
-    } else {
-      setErrorMessage("Gagal mengakses kamera. Silakan coba lagi.");
-    }
+    setErrorMessage("Gagal mengakses kamera. Silakan coba lagi.");
     setShowErrorDialog(true);
   }
-};
-
-const stopCamera = () => {
-  console.log('Stopping camera and scanning...');
-  
-  // Stop scanning first
-  setIsScanning(false);
-  
-  // Reset scanner flag
-  scannerStartedRef.current = false;
-  
-  // Stop animation frame
-  if (animationFrameRef.current) {
-    console.log('🛑 Stopping animation frame...');
-    cancelAnimationFrame(animationFrameRef.current);
-    animationFrameRef.current = null;
-  }
-  
-  // Stop camera stream
-  if (streamRef.current) {
-    streamRef.current.getTracks().forEach(track => track.stop());
-    streamRef.current = null;
-  }
-  if (videoRef.current) {
-    videoRef.current.srcObject = null;
-  }
-  
-  // Reset camera state
-  setCameraActive(false);
-  
-  console.log('Camera and scanning stopped');
 };
 
 const validateQRCode = async (qrData: QRData): Promise<Location | null> => {
@@ -658,52 +650,193 @@ const simulateQRScan = async () => {
 };
 
   const confirmDisposal = async () => {
-    if (!scanResult) return;
+    console.log('🚀 confirmDisposal function STARTED!');
+    console.log('  - isProcessing:', isProcessing);
+    console.log('  - confirmDisposalRef.current:', confirmDisposalRef.current);
+    console.log('  - scanResult exists:', !!scanResult);
+    
+    if (!scanResult || isProcessing || confirmDisposalRef.current) {
+      console.log('🚫 confirmDisposal BLOCKED - Early return');
+      return;
+    }
 
+    console.log('✅ confirmDisposal PASSED initial checks');
+    console.log('🚀 Starting confirmDisposal - isProcessing:', isProcessing);
+    confirmDisposalRef.current = true;
     setIsProcessing(true);
 
     try {
+      // Add small delay to prevent double-clicks
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User tidak ditemukan");
 
       const weightKg = scanResult.bottles * 0.025;
       const pointsEarned = scanResult.bottles * 10;
 
-      const { error: activityError } = await supabase.from("activities").insert({
+      console.log('📊 Saving activity data:');
+      console.log('  - User ID:', user.id);
+      console.log('  - Location ID:', scanResult.location.id);
+      console.log('  - Bottles Count:', scanResult.bottles);
+      console.log('  - Weight Kg:', weightKg);
+      console.log('  - Points Earned:', pointsEarned);
+      console.log('  - Timestamp:', new Date().toISOString());
+      console.log('  - Execution ID:', Math.random().toString(36).substr(2, 9));
+
+      const { data: activityData, error: activityError } = await supabase.from("activities").insert({
         user_id: user.id,
         location_id: scanResult.location.id,
         bottles_count: scanResult.bottles,
         weight_kg: weightKg,
         points_earned: pointsEarned,
-      });
+      }).select().single();
 
       if (activityError) throw activityError;
 
-      const { data: profile } = await supabase
+      console.log('✅ Activity saved successfully:', activityData);
+
+      // Small delay to ensure activity is committed to database
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Calculate profile based on activities to avoid race conditions
+      console.log('📈 Calculating profile based on activities...');
+      
+      // Check current profile BEFORE fetching activities
+      const { data: profileBefore, error: profileBeforeError } = await supabase
         .from("profiles")
         .select("points, total_bottles, total_weight_kg")
         .eq("user_id", user.id)
         .single();
-
-      if (profile) {
-        await supabase
-          .from("profiles")
-          .update({
-            points: profile.points + pointsEarned,
-            total_bottles: profile.total_bottles + scanResult.bottles,
-            total_weight_kg: Number(profile.total_weight_kg) + weightKg,
-          })
-          .eq("user_id", user.id);
+      
+      if (profileBeforeError) {
+        console.error('❌ Error fetching profile before:', profileBeforeError);
+      } else {
+        console.log('📋 Profile BEFORE activity fetch:', profileBefore);
+        
+        // Check if profile was already updated by trigger
+        const expectedFromTrigger = {
+          points: (profileBefore.points || 0) - pointsEarned,
+          bottles: (profileBefore.total_bottles || 0) - scanResult.bottles,
+          weight: (profileBefore.total_weight_kg || 0) - weightKg
+        };
+        
+        console.log('🔍 Trigger detection:');
+        console.log('  - Profile after trigger:', profileBefore);
+        console.log('  - Expected before trigger:', expectedFromTrigger);
+        console.log('  - Difference from trigger:', {
+          points: profileBefore.points - expectedFromTrigger.points,
+          bottles: profileBefore.total_bottles - expectedFromTrigger.bottles,
+          weight: profileBefore.total_weight_kg - expectedFromTrigger.weight
+        });
+        
+        // If profile already updated by trigger, skip manual update
+        if (profileBefore.points >= pointsEarned && 
+            profileBefore.total_bottles >= scanResult.bottles) {
+          console.log('✅ Profile already updated by trigger - skipping manual update');
+          toast.success(`+${pointsEarned} poin! Terima kasih telah berkontribusi!`);
+          setShowConfirmDialog(false);
+          setScanResult(null);
+          navigate("/home");
+          return;
+        }
       }
+      
+      // Fetch all user activities to calculate correct totals
+      const { data: userActivities, error: activitiesError } = await supabase
+        .from("activities")
+        .select("bottles_count, points_earned, weight_kg")
+        .eq("user_id", user.id);
+      
+      if (activitiesError) {
+        console.error('❌ Error fetching activities:', activitiesError);
+        throw activitiesError;
+      }
+      
+      // Add current activity to the calculation (in case it's not yet included)
+      const allActivities = [...userActivities, {
+        bottles_count: scanResult.bottles,
+        points_earned: pointsEarned,
+        weight_kg: weightKg
+      }];
+      
+      const totalBottles = allActivities.reduce((sum, act) => sum + act.bottles_count, 0);
+      const totalPoints = allActivities.reduce((sum, act) => sum + act.points_earned, 0);
+      const totalWeight = allActivities.reduce((sum, act) => sum + act.weight_kg, 0);
+      
+      console.log('📊 Activity-based calculation:');
+      console.log('  - Fetched activities:', userActivities.length);
+      console.log('  - Including current activity:', allActivities.length);
+      console.log('  - Total bottles from activities:', totalBottles);
+      console.log('  - Total points from activities:', totalPoints);
+      console.log('  - Total weight from activities:', totalWeight);
+      console.log('  - Current activity: +', scanResult.bottles, 'bottles, +', pointsEarned, 'points, +', weightKg, 'kg');
+
+      const { data: updatedProfile, error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          points: totalPoints,
+          total_bottles: totalBottles,
+          total_weight_kg: totalWeight,
+        })
+        .eq("user_id", user.id)
+        .select()
+        .single();
+
+        if (updateError) {
+          console.error('❌ Profile update error:', updateError);
+          // Continue even if profile update fails - activity was saved
+          console.log('⚠️ Activity saved but profile update failed - User can continue');
+        } else {
+          console.log('✅ Profile updated successfully based on activities:', updatedProfile);
+          
+          // Check if there's a discrepancy (possible trigger)
+          const expectedBottles = totalBottles;
+          const actualBottles = updatedProfile.total_bottles;
+          
+          if (actualBottles !== expectedBottles) {
+            console.log('🚨 DISCREPANCY DETECTED!');
+            console.log('  - Expected bottles:', expectedBottles);
+            console.log('  - Actual bottles:', actualBottles);
+            console.log('  - Difference:', actualBottles - expectedBottles);
+            console.log('  - Possible cause: Database trigger or concurrent update');
+          }
+          
+          console.log('🎯 Final result - Profile now reflects ALL activities correctly');
+        }
 
       toast.success(`+${pointsEarned} poin! Terima kasih telah berkontribusi!`);
       setShowConfirmDialog(false);
       setScanResult(null);
       navigate("/home");
     } catch (error: any) {
-      toast.error("Gagal menyimpan data pembuangan");
+      console.error('❌ Error saving disposal data:', error);
+      
+      // Log specific error details
+      if (error.code === 'PGRST116') {
+        console.error('❌ Table or RLS policy issue - Check if tables exist and RLS policies allow access');
+        toast.error('Database configuration error. Please contact support.');
+      } else if (error.code === '42P01') {
+        console.error('❌ Missing table error - Table does not exist:', error.message);
+        if (error.message.includes('ranking_tiers')) {
+          console.error('❌ ranking_tiers table is missing - This might be referenced in RLS policies or triggers');
+          toast.error('Database setup incomplete. Activity saved, but ranking update failed. Admin will fix this soon.');
+        } else {
+          toast.error('Database table missing: ' + error.message);
+        }
+      } else if (error.status === 404) {
+        console.error('❌ 404 Error - Table not found or permission denied');
+        toast.error('Database table not found. Check RLS policies.');
+      } else if (error.status === 403) {
+        console.error('❌ 403 Error - Permission denied');
+        toast.error('Permission denied. Check RLS policies.');
+      } else {
+        console.error('❌ Unknown error:', error.message);
+        toast.error('Gagal menyimpan data: ' + (error.message || 'Unknown error'));
+      }
     } finally {
       setIsProcessing(false);
+      confirmDisposalRef.current = false;
     }
   };
 
@@ -923,7 +1056,15 @@ const simulateQRScan = async () => {
 
           <DialogFooter className="gap-2">
             <Button 
-              onClick={confirmDisposal} 
+              onClick={() => {
+                console.log('🔘 Konfirmasi button clicked!');
+                console.log('  - Current isProcessing:', isProcessing);
+                console.log('  - confirmDisposalRef.current:', confirmDisposalRef.current);
+                console.log('  - ScanResult:', scanResult);
+                console.log('  - Timestamp:', new Date().toISOString());
+                console.log('  - Execution ID:', Math.random().toString(36).substr(2, 9));
+                confirmDisposal();
+              }} 
               disabled={isProcessing}
               className="flex-1 h-12 rounded-xl font-semibold"
             >
