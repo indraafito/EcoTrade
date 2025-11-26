@@ -55,6 +55,9 @@ interface Mission {
   verified: boolean;
   status: string;
   difficulty?: string;
+  expires_at?: string | null;
+  started_at?: string;
+  duration_hours?: number;
 }
 
 const Home = () => {
@@ -206,7 +209,116 @@ const Home = () => {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      setMissions([]);
+      // Fetch active missions only
+      const { data: allMissions, error: missionsError } = await supabase
+        .from("missions")
+        .select("*")
+        .eq("is_active", true)
+        .order("difficulty", { ascending: true });
+
+      if (missionsError) {
+        console.error("Error fetching missions:", missionsError);
+        setMissions([]);
+        return;
+      }
+
+      if (!allMissions || allMissions.length === 0) {
+        console.log("No active missions found");
+        setMissions([]);
+        return;
+      }
+
+      // Fetch user's mission progress
+      const { data: userProgress, error: progressError } = await supabase
+        .from("mission_progress")
+        .select("*")
+        .eq("user_id", user.id)
+        .in("status", ["in_progress", "completed"]);
+
+      if (progressError) {
+        console.error("Error fetching progress:", progressError);
+      }
+
+      // If no progress exists, create initial progress for first 3 missions
+      if (!userProgress || userProgress.length === 0) {
+        const initialMissions = allMissions.slice(0, 3);
+        const now = new Date();
+        
+        const progressToCreate = initialMissions.map((mission) => ({
+          user_id: user.id,
+          mission_id: mission.id,
+          progress_value: 0,
+          status: "in_progress",
+          started_at: now.toISOString(),
+        }));
+
+        const { data: newProgress, error: createError } = await supabase
+          .from("mission_progress")
+          .insert(progressToCreate)
+          .select();
+
+        if (createError) {
+          console.error("Error creating mission progress:", createError);
+        }
+
+        const transformedMissions = initialMissions.map((m) => ({
+          id: m.id,
+          mission_id: m.id,
+          mission_title: m.title,
+          description: m.description,
+          target_type: m.target_type,
+          target_value: m.target_value,
+          progress_value: 0,
+          progress_percentage: 0,
+          points_bonus: m.points_bonus,
+          completed_at: null,
+          verified: false,
+          status: "in_progress",
+          difficulty: m.difficulty,
+          duration_hours: m.duration_hours,
+          started_at: now.toISOString(),
+          expires_at: m.duration_hours 
+            ? new Date(now.getTime() + m.duration_hours * 60 * 60 * 1000).toISOString()
+            : null,
+        }));
+
+        setMissions(transformedMissions);
+        return;
+      }
+
+      // Map missions with progress
+      const missionsWithProgress = allMissions
+        .map((mission) => {
+          const progress = userProgress.find((p) => p.mission_id === mission.id);
+          if (!progress) return null;
+          if (progress.status === "claimed" || progress.status === "expired") return null;
+
+          return {
+            id: progress.id,
+            mission_id: mission.id,
+            mission_title: mission.title,
+            description: mission.description,
+            target_type: mission.target_type,
+            target_value: mission.target_value,
+            progress_value: progress.progress_value || 0,
+            progress_percentage: Math.min(
+              ((progress.progress_value || 0) / mission.target_value) * 100,
+              100
+            ),
+            points_bonus: mission.points_bonus,
+            completed_at: progress.completed_at,
+            verified: progress.verified || false,
+            status: progress.status,
+            difficulty: mission.difficulty,
+            duration_hours: mission.duration_hours,
+            started_at: progress.started_at,
+            expires_at: progress.expires_at,
+          };
+        })
+        .filter(Boolean)
+        .slice(0, 3);
+
+      setMissions(missionsWithProgress as Mission[]);
     } catch (error: any) {
       console.error("Error fetching missions:", error);
       setMissions([]);
@@ -214,8 +326,47 @@ const Home = () => {
   };
 
   const claimMissionReward = async (missionProgressId: string, pointsBonus: number) => {
-    // Missions feature not implemented yet
-    toast.info("Fitur misi akan segera hadir!");
+    try {
+      setClaimingMission(missionProgressId);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Update mission progress to claimed
+      const { error: updateError } = await supabase
+        .from("mission_progress")
+        .update({
+          status: "claimed",
+          claimed_at: new Date().toISOString(),
+          verified: true,
+        })
+        .eq("id", missionProgressId);
+
+      if (updateError) throw updateError;
+
+      // Update user points
+      const { error: pointsError } = await supabase
+        .from("profiles")
+        .update({
+          points: (profile?.points || 0) + pointsBonus,
+        })
+        .eq("user_id", user.id);
+
+      if (pointsError) throw pointsError;
+
+      toast.success(`🎉 Selamat! Kamu mendapat ${pointsBonus} poin!`);
+
+      // Refresh data
+      await fetchProfile();
+      await fetchMissions();
+    } catch (error: any) {
+      console.error("Error claiming reward:", error);
+      toast.error("Gagal claim reward: " + error.message);
+    } finally {
+      setClaimingMission(null);
+    }
   };
 
   const getDifficultyColor = (difficulty?: string) => {
@@ -228,6 +379,28 @@ const Home = () => {
         return "bg-red-500/10 text-red-600 dark:text-red-400";
       default:
         return "bg-primary/10 text-primary";
+    }
+  };
+
+  const getTimeRemaining = (expiresAt?: string | null) => {
+    if (!expiresAt) return null;
+    
+    const now = new Date();
+    const expiry = new Date(expiresAt);
+    const diff = expiry.getTime() - now.getTime();
+    
+    if (diff <= 0) return "Expired";
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours >= 24) {
+      const days = Math.floor(hours / 24);
+      return `${days} hari lagi`;
+    } else if (hours > 0) {
+      return `${hours} jam lagi`;
+    } else {
+      return `${minutes} menit lagi`;
     }
   };
 
@@ -336,6 +509,14 @@ const Home = () => {
                       Progress: {mission.progress_value}/{mission.target_value}{" "}
                       {mission.target_type}
                     </p>
+                    {mission.expires_at && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <Clock className="w-3 h-3 text-orange-500" />
+                        <p className="text-[10px] font-semibold text-orange-500">
+                          {getTimeRemaining(mission.expires_at)}
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <div className="bg-primary/10 px-2.5 py-1 rounded-lg">
                     <p className="font-bold text-primary text-xs">
