@@ -1,27 +1,130 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import BottomNav from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { QrCode, CheckCircle2, Scan, MapPin, Package, Weight, Award, Leaf } from "lucide-react";
+import { QrCode, CheckCircle2, Scan, MapPin, Package, Weight, Award, Leaf, AlertCircle, Camera, CameraOff, X } from "lucide-react";
 import { toast } from "sonner";
+import jsQR from 'jsqr';
 
 interface Location {
   id: string;
   name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  is_active: boolean;
 }
+
+interface QRData {
+  locationId: string;
+  locationName: string;
+  timestamp: string;
+}
+
+// QR Code scanner configuration
+const QR_CONFIG = {
+  // QR code pattern matching
+  QR_PATTERN: /^ecotrade:location:([a-f0-9-]{36}):(.+):(\d+)$/,
+  
+  // Parse QR data
+  parseQRData: (qrText: string): QRData | null => {
+    console.log('🔧 Parsing QR data:', qrText);
+    
+    // Try to parse as JSON first
+    try {
+      const jsonData = JSON.parse(qrText);
+      console.log('📝 QR data is JSON format:', jsonData);
+      
+      // Check if it has required fields
+      if (jsonData.locationId && jsonData.locationName && jsonData.timestamp) {
+        const qrData = {
+          locationId: jsonData.locationId,
+          locationName: jsonData.locationName,
+          timestamp: jsonData.timestamp
+        };
+        
+        console.log('✅ QR data parsed successfully (JSON):', qrData);
+        return qrData;
+      } else {
+        console.log('❌ JSON QR data missing required fields');
+        return null;
+      }
+    } catch (jsonError) {
+      console.log('📝 QR data is not JSON, trying string format...');
+    }
+    
+    // Try string format
+    const match = qrText.match(QR_CONFIG.QR_PATTERN);
+    if (match) {
+      const qrData = {
+        locationId: match[1],
+        locationName: match[2],
+        timestamp: new Date(parseInt(match[3]) * 1000).toISOString()
+      };
+      
+      console.log('✅ QR data parsed successfully (string):', qrData);
+      return qrData;
+    }
+    
+    console.log('❌ QR pattern does not match EcoTrade format');
+    console.log('🔍 Expected formats:');
+    console.log('  - String: ecotrade:location:{uuid}:{name}:{timestamp}');
+    console.log('  - JSON: {"locationId":"{uuid}","locationName":"{name}","timestamp":"{iso}"}');
+    return null;
+  }
+};
 
 const ScanPage = () => {
   const navigate = useNavigate();
   const [isScanning, setIsScanning] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [scanResult, setScanResult] = useState<{ bottles: number; location: Location } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const scannerStartedRef = useRef(false); // Add flag to prevent multiple instances
 
   useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    // Cleanup camera when component unmounts
+    return () => {
+      stopCamera();
+    };
+  }, []);
+
+  // Start QR scanning when states are ready
+  useEffect(() => {
+    if (isScanning && cameraActive && videoRef.current && canvasRef.current && !scannerStartedRef.current) {
+      console.log('🚀 useEffect triggered - Starting QR scanning...');
+      console.log('📊 useEffect states:', {
+        isScanning,
+        cameraActive,
+        hasVideo: !!videoRef.current,
+        hasCanvas: !!canvasRef.current,
+        scannerAlreadyStarted: scannerStartedRef.current
+      });
+      
+      // Set flag to prevent multiple instances
+      scannerStartedRef.current = true;
+      startRealQRScanning();
+    }
+    
+    // Reset flag when scanning stops
+    if (!isScanning || !cameraActive) {
+      scannerStartedRef.current = false;
+    }
+  }, [isScanning, cameraActive]);
 
   const checkAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -30,31 +133,484 @@ const ScanPage = () => {
     }
   };
 
-  const simulateScan = async () => {
-    setIsScanning(true);
+  const checkCameraPermission = async (): Promise<boolean> => {
+  try {
+    const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
+    setHasPermission(result.state === 'granted');
+    return result.state === 'granted';
+  } catch (error) {
+    console.error('Error checking camera permission:', error);
+    return false;
+  }
+};
 
-    try {
-      const { data: locations } = await supabase
-        .from("locations")
-        .select("id, name")
-        .eq("is_active", true)
-        .limit(1)
-        .single();
-
-      setTimeout(() => {
-        const bottles = Math.floor(Math.random() * 5) + 1;
-        setScanResult({
-          bottles,
-          location: locations || { id: "", name: "Lokasi Demo" },
-        });
-        setIsScanning(false);
-        setShowConfirmDialog(true);
-      }, 2000);
-    } catch (error) {
-      toast.error("Gagal memindai QR code");
-      setIsScanning(false);
+const startCamera = async () => {
+  try {
+    // Check camera permission first
+    const hasPermission = await checkCameraPermission();
+    if (!hasPermission) {
+      setErrorMessage("Aplikasi membutuhkan izin kamera untuk memindai QR Code. Silakan berikan izin kamera di pengaturan browser.");
+      setShowErrorDialog(true);
+      return;
     }
+
+    // Start camera stream
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { 
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    });
+
+    console.log('Camera stream obtained:', stream);
+
+    // Set camera active state first to ensure video ref is available
+    setCameraActive(true);
+    
+    // Wait a bit for React to update the DOM
+    setTimeout(() => {
+      if (videoRef.current) {
+        console.log('Video ref is now available');
+        
+        // Set stream to video element
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+        
+        // Wait for video to load
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Video metadata loaded');
+          videoRef.current?.play().then(() => {
+            console.log('Video playing successfully');
+            
+            // Set states first - useEffect will handle starting QR scanner
+            setCameraActive(true);
+            setIsScanning(true);
+            
+          }).catch((error) => {
+            console.error('Error playing video:', error);
+            setErrorMessage("Gagal memutar video kamera. Silakan coba lagi.");
+            setShowErrorDialog(true);
+            stopCamera();
+          });
+        };
+
+        videoRef.current.onerror = (error) => {
+          console.error('Video error:', error);
+          setErrorMessage("Terjadi kesalahan pada video kamera. Silakan coba lagi.");
+          setShowErrorDialog(true);
+          stopCamera();
+        };
+      } else {
+        console.error('Video ref is still null after timeout');
+        setErrorMessage("Gagal menginisialisasi video kamera. Silakan refresh halaman dan coba lagi.");
+        setShowErrorDialog(true);
+        stopCamera();
+      }
+    }, 100); // Small delay to ensure DOM is updated
+  } catch (error: any) {
+    console.error('Error starting camera:', error);
+    if (error.name === 'NotAllowedError') {
+      setErrorMessage("Izin kamera ditolak. Silakan berikan izin kamera untuk menggunakan fitur scan QR Code.");
+    } else if (error.name === 'NotFoundError') {
+      setErrorMessage("Tidak ada kamera yang ditemukan. Pastikan perangkat Anda memiliki kamera.");
+    } else if (error.name === 'NotReadableError') {
+      setErrorMessage("Kamera sedang digunakan oleh aplikasi lain. Silakan tutup aplikasi lain dan coba lagi.");
+    } else {
+      setErrorMessage("Gagal mengakses kamera. Silakan coba lagi.");
+    }
+    setShowErrorDialog(true);
+  }
+};
+
+const stopCamera = () => {
+  console.log('Stopping camera and scanning...');
+  
+  // Stop scanning first
+  setIsScanning(false);
+  
+  // Reset scanner flag
+  scannerStartedRef.current = false;
+  
+  // Stop animation frame
+  if (animationFrameRef.current) {
+    console.log('🛑 Stopping animation frame...');
+    cancelAnimationFrame(animationFrameRef.current);
+    animationFrameRef.current = null;
+  }
+  
+  // Stop camera stream
+  if (streamRef.current) {
+    streamRef.current.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
+  }
+  if (videoRef.current) {
+    videoRef.current.srcObject = null;
+  }
+  
+  // Reset camera state
+  setCameraActive(false);
+  
+  console.log('Camera and scanning stopped');
+};
+
+const validateQRCode = async (qrData: QRData): Promise<Location | null> => {
+  console.log('�️ Starting database validation...');
+  console.log('🔍 Query parameters:');
+  console.log('  - Location ID:', qrData.locationId);
+  console.log('  - Location Name:', qrData.locationName);
+  
+  try {
+    // Query location and its QR codes
+    const { data, error } = await supabase
+      .from("locations")
+      .select(`
+        *,
+        location_qr_codes (
+          qr_code_url,
+          qr_data
+        )
+      `)
+      .eq("id", qrData.locationId)
+      .eq("is_active", true)
+      .single();
+
+    console.log('📊 Database query result:');
+    console.log('  - Error:', error);
+    console.log('  - Data:', data);
+
+    if (error) {
+      console.error('❌ Database query error:', error);
+      return null;
+    }
+
+    if (!data) {
+      console.log('❌ No location found with ID:', qrData.locationId);
+      console.log('🔍 Check if:');
+      console.log('  - Location exists in database');
+      console.log('  - Location is active (is_active = true)');
+      return null;
+    }
+
+    console.log('✅ Location found:', data.name);
+    console.log('� Location details:');
+    console.log('  - ID:', data.id);
+    console.log('  - Name:', data.name);
+    console.log('  - Address:', data.address);
+    console.log('  - Is Active:', data.is_active);
+    console.log('  - QR Codes:', data.location_qr_codes);
+
+    // Check if QR codes exist and match
+    console.log('🔍 Checking QR codes for location...');
+    console.log('📋 Raw location_qr_codes data:', data.location_qr_codes);
+    
+    // Handle both object and array formats
+    let qrCodeRecord = null;
+    
+    if (Array.isArray(data.location_qr_codes)) {
+      // Array format (multiple QR codes)
+      if (data.location_qr_codes.length > 0) {
+        qrCodeRecord = data.location_qr_codes[0];
+        console.log('✅ QR codes found as array, using first record');
+      }
+    } else if (data.location_qr_codes && typeof data.location_qr_codes === 'object') {
+      // Object format (single QR code)
+      qrCodeRecord = data.location_qr_codes;
+      console.log('✅ QR codes found as single object');
+    }
+    
+    if (qrCodeRecord) {
+      console.log('📝 QR code record:', qrCodeRecord);
+      
+      // Check different possible structures
+      let storedQRData = null;
+      
+      if (qrCodeRecord.qr_data) {
+        storedQRData = qrCodeRecord.qr_data;
+        console.log('📝 Found qr_data field:', storedQRData);
+      } else if (typeof qrCodeRecord === 'object' && qrCodeRecord !== null) {
+        // Maybe the QR data is directly in the record
+        if (qrCodeRecord.locationId && qrCodeRecord.locationName) {
+          storedQRData = qrCodeRecord;
+          console.log('📝 QR data is directly in record:', storedQRData);
+        }
+      }
+      
+      if (storedQRData) {
+        console.log('📝 Stored QR data:', storedQRData);
+        console.log('📝 Scanned QR data:', qrData);
+        
+        // Compare locationId (most important)
+        if (storedQRData.locationId === qrData.locationId) {
+          console.log('✅ QR data matches database record');
+          return {
+            id: data.id,
+            name: data.name,
+            address: data.address,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            is_active: data.is_active
+          };
+        } else {
+          console.log('❌ QR data mismatch');
+          console.log('  - Expected locationId:', storedQRData.locationId);
+          console.log('  - Scanned locationId:', qrData.locationId);
+        }
+      } else {
+        console.log('❌ Could not extract QR data from record');
+      }
+    } else {
+      console.log('❌ No QR codes found for this location');
+      console.log('🔍 location_qr_codes value:', data.location_qr_codes);
+      console.log('🔍 Type of location_qr_codes:', typeof data.location_qr_codes);
+      console.log('🔍 Is array?:', Array.isArray(data.location_qr_codes));
+      console.log('🔍 Length:', data.location_qr_codes?.length);
+    }
+
+    return null;
+  } catch (error) {
+    console.error('💥 Error in validateQRCode:', error);
+    return null;
+  }
+};
+
+const getValidLocationForDemo = async (): Promise<QRData | null> => {
+  try {
+    // Get first active location with QR code from database
+    const { data, error } = await (supabase as any)
+      .from("locations")
+      .select(`
+        id,
+        name,
+        location_qr_codes (
+          qr_data
+        )
+      `)
+      .eq("is_active", true)
+      .limit(1)
+      .single();
+
+    if (error || !data) {
+      console.log('No valid location found for demo');
+      return null;
+    }
+
+    // Return QR data for demo
+    return {
+      locationId: data.id,
+      locationName: data.name,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error getting valid location:', error);
+    return null;
+  }
+};
+
+const startRealQRScanning = async () => {
+  if (!videoRef.current || !canvasRef.current) {
+    console.log('❌ Video or canvas ref not available');
+    return;
+  }
+
+  try {
+    console.log('🚀 Starting real QR scanning with JavaScript...');
+    
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) {
+      console.log('❌ Could not get canvas context');
+      return;
+    }
+
+    // Set canvas size to match video
+    const scanFrame = () => {
+      console.log('🔄 Scanning frame - States:', {
+        isScanning,
+        cameraActive,
+        videoReady: videoRef.current?.readyState === videoRef.current?.HAVE_ENOUGH_DATA,
+        hasVideo: !!videoRef.current,
+        hasCanvas: !!canvasRef.current
+      });
+      
+      // Check if should continue scanning (useEffect already validated initial state)
+      if (!isScanning || !cameraActive || !videoRef.current || !canvasRef.current) {
+        console.log('🛑 Stopping scan frame - Conditions not met');
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
+        return;
+      }
+
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      
+      if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) {
+        console.log('📹 Video not ready, continuing to next frame...');
+        // Video not ready, try next frame
+        animationFrameRef.current = requestAnimationFrame(scanFrame);
+        return;
+      }
+
+      // Set canvas dimensions to match video
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      // Draw video frame to canvas
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Get image data from canvas
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      
+      // Use jsQR to detect QR code
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "dontInvert",
+      });
+
+      if (code) {
+        console.log('🎯 Real QR code detected with JavaScript:', code.data);
+        console.log('📝 QR Data length:', code.data.length);
+        console.log('📝 QR Data type:', typeof code.data);
+        
+        // Check if it's an EcoTrade QR code (JSON or string format)
+        const isEcoTradeQR = code.data.startsWith('ecotrade:location:') || 
+                            code.data.includes('"locationId"') || 
+                            code.data.includes('locationId');
+        
+        console.log('🏷️ Is EcoTrade QR:', isEcoTradeQR);
+        
+        if (isEcoTradeQR) {
+          handleQRDetection(code.data);
+        } else {
+          console.log('❌ Not an EcoTrade QR code');
+          console.log('🔍 Expected EcoTrade formats:');
+          console.log('  - String: ecotrade:location:{uuid}:{name}:{timestamp}');
+          console.log('  - JSON: {"locationId":"{uuid}","locationName":"{name}","timestamp":"{iso}"}');
+          
+          // Show error dialog for non-EcoTrade QR codes
+          setErrorMessage("QR Code yang Anda pindai bukan QR Code resmi EcoTrade. Pastikan Anda memindai QR Code dari lokasi penimbunan resmi EcoTrade.");
+          setShowErrorDialog(true);
+          
+          // Stop scanning after non-EcoTrade QR detection
+          setIsScanning(false);
+          stopCamera();
+        }
+        return; // Stop processing this frame
+      }
+
+      // Continue scanning
+      animationFrameRef.current = requestAnimationFrame(scanFrame);
+    };
+
+    // Start scanning frames immediately (useEffect already validated states)
+    console.log('✅ JavaScript QR scanner started successfully');
+    scanFrame();
+    
+  } catch (error) {
+    console.error('💥 Error starting JavaScript QR scanner:', error);
+    setErrorMessage("Gagal memulai QR scanner. Silakan coba lagi.");
+    setShowErrorDialog(true);
+    stopCamera();
+  }
+};
+
+const startFallbackQRScanning = async () => {
+  console.log('🔄 Using fallback QR detection (development mode)');
+  
+  // Show fallback indicator
+  toast.info("Mode Development: Simulasi QR scanning", {
+    description: "QR scanner akan menggunakan simulasi untuk development"
+  });
+  
+  // Fallback: Simulate QR detection for development
+  const simulateQRDetection = async () => {
+    if (!isScanning || !cameraActive) return;
+    
+    // Simulate finding QR after 2-4 seconds
+    const delay = Math.random() * 2000 + 2000;
+    console.log(`⏱️ Simulating QR detection in ${delay.toFixed(0)}ms...`);
+    
+    setTimeout(async () => {
+      if (!isScanning || !cameraActive) return;
+      
+      // Use a valid EcoTrade QR format
+      const mockQRText = 'ecotrade:location:123e4567-e89b-12d3-a456-426614174000:Bank Sampah Cempaka:1701234567';
+      console.log('✅ QR Code detected (fallback):', mockQRText);
+      
+      await handleQRDetection(mockQRText);
+    }, delay);
   };
+  
+  // Start simulation
+  simulateQRDetection();
+};
+
+const handleQRDetection = async (qrText: string) => {
+  console.log('🎯 QR code detected:', qrText);
+  
+  // Parse QR data
+  const qrData = QR_CONFIG.parseQRData(qrText);
+  
+  if (!qrData) {
+    console.log('❌ QR data parsing failed');
+    setErrorMessage("Format QR Code tidak valid. Pastikan Anda memindai QR Code resmi EcoTrade.");
+    setShowErrorDialog(true);
+    stopCamera();
+    return;
+  }
+  
+  console.log('🔍 Validating QR data against database...');
+  console.log('📍 QR Location ID:', qrData.locationId);
+  console.log('📍 QR Location Name:', qrData.locationName);
+  console.log('📍 QR Timestamp:', qrData.timestamp);
+  
+  // Validate QR code against database
+  const validLocation = await validateQRCode(qrData);
+
+  if (!validLocation) {
+    console.log('❌ QR validation failed - location not found or inactive');
+    console.log('🔍 Possible reasons:');
+    console.log('  - Location ID not found in database');
+    console.log('  - Location is inactive (is_active = false)');
+    console.log('  - QR data mismatch with stored data');
+    console.log('  - Database connection error');
+    setErrorMessage("QR Code tidak valid atau tidak terdaftar di sistem. Pastikan Anda memindai QR Code dari lokasi resmi EcoTrade.");
+    setShowErrorDialog(true);
+    stopCamera();
+    return;
+  }
+
+  console.log('✅ QR validation successful!');
+  console.log('📍 Valid location:', validLocation);
+
+  // Generate random bottle count
+  const bottles = Math.floor(Math.random() * 5) + 1;
+  console.log('🍼 Generated bottle count:', bottles);
+  
+  setScanResult({
+    bottles,
+    location: validLocation,
+  });
+  
+  // Stop scanning before showing result
+  console.log('🛑 Stopping scanning before showing result...');
+  setIsScanning(false);
+  stopCamera();
+  setShowConfirmDialog(true);
+};
+
+const startQRScanning = async () => {
+  console.log('� startQRScanning called - using real QR detection');
+  await startRealQRScanning();
+};
+
+const simulateQRScan = async () => {
+  // This function is now replaced by startQRScanning
+  // Keeping for backward compatibility
+  await startQRScanning();
+};
 
   const confirmDisposal = async () => {
     if (!scanResult) return;
@@ -133,37 +689,82 @@ const ScanPage = () => {
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
           
           <div className="relative z-10 flex flex-col items-center justify-center min-h-[320px]">
-            {isScanning ? (
+            {cameraActive ? (
               <>
-                <div className="relative">
-                  <div className="w-40 h-40 border-4 border-primary/30 rounded-3xl animate-pulse" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <QrCode className="w-20 h-20 text-primary animate-pulse" />
+                <div className="relative w-full max-w-sm">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-64 object-cover rounded-2xl bg-black shadow-lg"
+                    style={{ transform: 'scaleX(-1)' }}
+                  />
+                  {/* Hidden canvas for QR processing */}
+                  <canvas
+                    ref={canvasRef}
+                    className="hidden"
+                    width="640"
+                    height="480"
+                  />
+                  {/* Scanning overlay */}
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute inset-4 border-2 border-primary/50 rounded-xl">
+                      <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-xl animate-pulse"></div>
+                      <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-xl animate-pulse"></div>
+                      <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-xl animate-pulse"></div>
+                      <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-xl animate-pulse"></div>
+                    </div>
+                    {/* Scanning line animation */}
+                    <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent animate-scan"></div>
                   </div>
-                  {/* Scanning line animation */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-primary animate-scan" />
+                  {/* Camera indicator */}
+                  <div className="absolute top-2 right-2 bg-red-500 w-3 h-3 rounded-full animate-pulse"></div>
                 </div>
-                <p className="text-xl font-bold text-foreground mb-2 mt-8">Memindai...</p>
-                <p className="text-sm text-muted-foreground text-center max-w-xs">
-                  Arahkan kamera ke QR code pada tempat sampah pintar
-                </p>
+                
+                <div className="text-center mt-6">
+                  <p className="text-xl font-bold text-foreground mb-2">Memindai QR Code...</p>
+                  <p className="text-sm text-muted-foreground text-center max-w-xs mb-4">
+                    Arahkan kamera ke QR Code pada lokasi pengumpulan EcoTrade
+                  </p>
+                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                    <span>Mencari QR Code...</span>
+                  </div>
+                </div>
+                
+                <Button
+                  onClick={stopCamera}
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                >
+                  <CameraOff className="w-4 h-4 mr-2" />
+                  Batalkan
+                </Button>
               </>
             ) : (
               <>
                 <div className="w-40 h-40 bg-gradient-to-br from-primary/20 to-[#1DBF73]/20 rounded-3xl flex items-center justify-center mb-6 shadow-lg">
-                  <QrCode className="w-20 h-20 text-primary" />
+                  <Camera className="w-20 h-20 text-primary" />
                 </div>
-                <p className="text-xl font-bold text-foreground mb-2">Siap untuk Scan</p>
-                <p className="text-sm text-muted-foreground text-center mb-8 max-w-xs">
-                  Tekan tombol di bawah untuk memulai pemindaian QR code
-                </p>
+                <div className="text-center">
+                  <p className="text-xl font-bold text-foreground mb-2">Siap untuk Scan</p>
+                  <p className="text-sm text-muted-foreground text-center mb-8 max-w-xs">
+                    Tekan tombol di bawah untuk memulai pemindaian QR Code dengan kamera
+                  </p>
+                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mb-6">
+                    <Camera className="w-3 h-3" />
+                    <span>Kamera diperlukan untuk memindai QR Code</span>
+                  </div>
+                </div>
                 <Button 
-                  onClick={simulateScan} 
+                  onClick={startCamera} 
                   size="lg" 
                   className="w-full max-w-xs h-14 text-base font-semibold rounded-2xl shadow-lg"
                 >
-                  <Scan className="w-5 h-5 mr-2" />
-                  Mulai Scan
+                  <Camera className="w-5 h-5 mr-2" />
+                  Buka Kamera
                 </Button>
               </>
             )}
@@ -287,7 +888,127 @@ const ScanPage = () => {
         </DialogContent>
       </Dialog>
 
+      {/* ================= ERROR DIALOG ================= */}
+      <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
+        <DialogContent className="rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                <AlertCircle className="w-6 h-6 text-red-600" />
+              </div>
+              QR Code Tidak Valid
+            </DialogTitle>
+            <DialogDescription>
+              QR Code yang dipindai tidak terdaftar dalam sistem EcoTrade
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 my-4">
+            <div className="bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 rounded-2xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
+                    QR Code Tidak Dikenali
+                  </p>
+                  <p className="text-xs text-red-700 dark:text-red-200">
+                    {errorMessage || "Pastikan Anda memindai QR Code dari lokasi pengumpulan resmi EcoTrade yang terdaftar di sistem."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                    Cara Mengatasi
+                  </p>
+                  <ul className="text-xs text-amber-700 dark:text-amber-200 space-y-1">
+                    <li>• Pastikan QR Code dari lokasi EcoTrade resmi</li>
+                    <li>• Cek kondisi QR Code (tidak rusak atau tertutup)</li>
+                    <li>• Hubungi admin jika QR Code tidak berfungsi</li>
+                    <li>• Pastikan lokasi dalam status aktif</li>
+                    <li>• Berikan izin kamera untuk menggunakan fitur scan</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              onClick={() => {
+                setShowErrorDialog(false);
+                setErrorMessage("");
+              }}
+              className="flex-1 h-12 rounded-xl font-semibold"
+            >
+              Coba Lagi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <BottomNav />
+      
+      <style>{`
+        @keyframes scan {
+          0% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(240px);
+          }
+          100% {
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-scan {
+          animation: scan 2s ease-in-out infinite;
+        }
+
+        /* QR Scanner styles */
+        .qr-scanner--container {
+          position: relative;
+          width: 100%;
+          height: 100%;
+        }
+
+        .qr-scanner--scan-region {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 250px;
+          height: 250px;
+          border: 2px solid #3b82f6;
+          border-radius: 12px;
+          box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+        }
+
+        .qr-scanner--outline {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          border: 2px solid #10b981;
+          border-radius: 12px;
+          animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+        }
+      `}</style>
     </div>
   );
 };
