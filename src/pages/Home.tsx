@@ -11,18 +11,21 @@ import {
   TrendingUp,
   Leaf,
   Award,
-  Bell,
   Droplets,
   Gift,
-  CheckCircle2,
   Sparkles,
+  Zap,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Profile {
   username: string;
   full_name: string;
-  points: number;
+  points: number; // Poin permanen untuk penukaran
+  xp: number; // XP bulan ini untuk leaderboard
+  xp_month: number;
+  xp_year: number;
   rank: number;
   total_bottles: number;
   total_weight_kg: number;
@@ -74,7 +77,8 @@ const Home = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [weeklyPoints, setWeeklyPoints] = useState(0);
+  const [weeklyXP, setWeeklyXP] = useState(0);
+  const [monthlyRank, setMonthlyRank] = useState<number | null>(null);
   const [claimingMission, setClaimingMission] = useState<string | null>(null);
 
   useEffect(() => {
@@ -82,6 +86,7 @@ const Home = () => {
     fetchProfile();
     fetchActivities();
     fetchMissions();
+    fetchMonthlyRank();
   }, []);
 
   const checkAuth = async () => {
@@ -100,19 +105,39 @@ const Home = () => {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        console.error("No user found");
-        navigate("/auth");
+                navigate("/auth");
         return;
       }
 
       const { data: profileData, error } = await supabase
         .from("profiles")
-        .select("username, full_name, points, rank, total_bottles, total_weight_kg")
+        .select(
+          "username, full_name, points, xp, xp_month, xp_year, rank, total_bottles, total_weight_kg"
+        )
         .eq("user_id", user.id)
         .single();
 
-      console.log('🔍 Raw profile data from database:', profileData);
-      console.log('🔍 Profile fetch error:', error);
+      const { count: voucherCount } = await supabase
+        .from("voucher_redemptions")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      const data = {
+        ...(profileData || {}),
+        total_vouchers: voucherCount || 0,
+      } as any;
+
+      console.log('🏠 === HOME PAGE DATA FETCH ===');
+      console.log('📋 Profile Data:', profileData);
+      console.log('🎫 Voucher Count:', voucherCount);
+      console.log('📊 Final Data:', data);
+      console.log('🔍 Points Analysis:');
+      console.log('  - Total Points:', data.points);
+      console.log('  - XP (Total):', data.xp);
+      console.log('  - XP Month:', data.xp_month);
+      console.log('  - XP Year:', data.xp_year);
+      console.log('  - Total Bottles:', data.total_bottles);
+      console.log('  - Total Vouchers:', data.total_vouchers);
 
       if (error) {
         if (error.code === "PGRST116") {
@@ -122,8 +147,14 @@ const Home = () => {
               {
                 user_id: user.id,
                 username: user.email?.split("@")[0] || "user",
-                full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
+                full_name:
+                  user.user_metadata?.full_name ||
+                  user.email?.split("@")[0] ||
+                  "User",
                 points: 0,
+                xp: 0,
+                xp_month: new Date().getMonth() + 1,
+                xp_year: new Date().getFullYear(),
                 rank: 0,
                 total_bottles: 0,
                 total_weight_kg: 0,
@@ -133,13 +164,15 @@ const Home = () => {
             .single();
 
           if (insertError) {
-            console.error("Error creating profile:", insertError);
-            toast.error("Gagal membuat profil: " + insertError.message);
+                        toast.error("Gagal membuat profil: " + insertError.message);
             return;
           }
 
           const profileWithDefaults = {
             ...newProfile,
+            xp: 0,
+            xp_month: 0,
+            xp_year: 0,
             total_carbon_emission: 0,
             total_earnings: 0,
             total_vouchers: 0,
@@ -154,66 +187,14 @@ const Home = () => {
         throw error;
       }
 
-      const { count: voucherCount } = await supabase
-        .from("voucher_redemptions")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
-
-      const estimatedCarbonEmission = (profileData.total_weight_kg || 0) * 0.5;
-      const estimatedEarnings = (profileData.points || 0) * 10;
-
-      // Auto-sync profile with activities if there's a discrepancy
-      const { data: activities, error: activitiesError } = await supabase
-        .from("activities")
-        .select("bottles_count, points_earned, weight_kg")
-        .eq("user_id", user.id);
-
-      if (!activitiesError && activities) {
-        const totalBottlesFromActivities = activities.reduce((sum, act) => sum + act.bottles_count, 0);
-        const totalPointsFromActivities = activities.reduce((sum, act) => sum + act.points_earned, 0);
-        const totalWeightFromActivities = activities.reduce((sum, act) => sum + act.weight_kg, 0);
-
-        console.log('🔍 Auto-sync check:');
-        console.log('  - Profile bottles:', profileData.total_bottles);
-        console.log('  - Activities bottles:', totalBottlesFromActivities);
-        console.log('  - Difference:', profileData.total_bottles - totalBottlesFromActivities);
-
-        // If there's a discrepancy, update profile
-        if (profileData.total_bottles !== totalBottlesFromActivities) {
-          console.log('🔧 Auto-syncing profile with activities...');
-          const { error: syncError } = await supabase
-            .from("profiles")
-            .update({
-              total_bottles: totalBottlesFromActivities,
-              points: totalPointsFromActivities,
-              total_weight_kg: totalWeightFromActivities,
-            })
-            .eq("user_id", user.id);
-
-          if (!syncError) {
-            console.log('✅ Profile synced successfully');
-            toast.success('🔧 Profile data telah disinkronkan dengan aktivitas');
-            profileData.total_bottles = totalBottlesFromActivities;
-            profileData.points = totalPointsFromActivities;
-            profileData.total_weight_kg = totalWeightFromActivities;
-          } else {
-            console.error('❌ Sync error:', syncError);
-          }
-        }
-      }
+      const estimatedCarbonEmission = (data.total_weight_kg || 0) * 0.5;
+      const estimatedEarnings = (data.points || 0) * 10;
 
       const profileWithEstimates = {
-        ...profileData,
+        ...(profileData || {}),
         total_carbon_emission: estimatedCarbonEmission,
         total_earnings: estimatedEarnings,
-        total_vouchers: voucherCount || 0,
-      };
-
-      console.log('📊 Profile with estimates:', profileWithEstimates);
-      console.log('🔍 Final check - Database vs Display:');
-      console.log('  - Database total_bottles:', profileData.total_bottles);
-      console.log('  - Display total_bottles:', profileWithEstimates.total_bottles);
-      console.log('  - Are they equal?', profileData.total_bottles === profileWithEstimates.total_bottles);
+      } as any;
 
       setProfile(profileWithEstimates);
     } catch (error: any) {
@@ -233,7 +214,9 @@ const Home = () => {
 
       const { data, error } = await supabase
         .from("activities")
-        .select("id, bottles_count, points_earned, created_at, locations (name)")
+        .select(
+          "id, bottles_count, points_earned, created_at, locations (name)"
+        )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(5);
@@ -243,18 +226,45 @@ const Home = () => {
       const activitiesData = data || [];
       setActivities(activitiesData);
 
-      const now = new Date();
+      // Calculate weekly XP from xp_transactions
       const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(now.getDate() - 7);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const pointsThisWeek = activitiesData
-        .filter((act) => new Date(act.created_at) >= sevenDaysAgo)
-        .reduce((sum, act) => sum + act.points_earned, 0);
+      const { data: xpData, error: xpError } = await (supabase as any)
+        .from("xp_transactions")
+        .select("amount")
+        .eq("user_id", user.id)
+        .eq("type", "earn")
+        .gte("created_at", sevenDaysAgo.toISOString());
 
-      setWeeklyPoints(pointsThisWeek);
+      if (!xpError && xpData) {
+        const weeklyTotal = xpData.reduce((sum, tx) => sum + tx.amount, 0);
+        setWeeklyXP(weeklyTotal);
+      }
     } catch (error: any) {
       console.error("Error fetching activities:", error);
       toast.error("Gagal memuat aktivitas");
+    }
+  };
+
+  const fetchMonthlyRank = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await (supabase as any)
+        .from("leaderboard_view")
+        .select("user_id, position")
+        .eq("user_id", user.id)
+        .single();
+
+      if (!error && data) {
+        setMonthlyRank(data.position);
+      }
+    } catch (error: any) {
+      console.error("Error fetching rank:", error);
     }
   };
 
@@ -265,7 +275,6 @@ const Home = () => {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch active missions only
       const { data: allMissions, error: missionsError } = await supabase
         .from("missions" as any)
         .select("*")
@@ -279,12 +288,10 @@ const Home = () => {
       }
 
       if (!allMissions || allMissions.length === 0) {
-        console.log("No active missions found");
         setMissions([]);
         return;
       }
 
-      // Fetch user's mission progress
       const { data: userProgress, error: progressError } = await supabase
         .from("mission_progress" as any)
         .select("*")
@@ -295,12 +302,11 @@ const Home = () => {
         console.error("Error fetching progress:", progressError);
       }
 
-      // If no progress exists, create initial progress for first 3 missions
       if (!userProgress || userProgress.length === 0) {
         const initialMissions = allMissions.slice(0, 3);
         const now = new Date();
         
-        const progressToCreate = initialMissions.map((mission: any) => ({
+        const progressToCreate = initialMissions.map((mission) => ({
           user_id: user.id,
           mission_id: mission.id,
           progress_value: 0,
@@ -333,8 +339,10 @@ const Home = () => {
           difficulty: m.difficulty,
           duration_hours: m.duration_hours,
           started_at: now.toISOString(),
-          expires_at: m.duration_hours 
-            ? new Date(now.getTime() + m.duration_hours * 60 * 60 * 1000).toISOString()
+          expires_at: m.duration_hours
+            ? new Date(
+                now.getTime() + m.duration_hours * 60 * 60 * 1000
+              ).toISOString()
             : null,
         }));
 
@@ -342,13 +350,12 @@ const Home = () => {
         return;
       }
 
-      // Map missions with progress
       const missionsWithProgress = allMissions
-        .map((mission: any) => {
-          if (!userProgress || Array.isArray(userProgress) === false) return null;
-          const progress = (userProgress as any[]).find((p: any) => p.mission_id === mission.id);
+        .map((mission) => {
+          const progress = userProgress.find((p) => p.mission_id === mission.id);
           if (!progress) return null;
-          if (progress.status === "claimed" || progress.status === "expired") return null;
+          if (progress.status === "claimed" || progress.status === "expired")
+            return null;
 
           return {
             id: progress.id,
@@ -382,7 +389,10 @@ const Home = () => {
     }
   };
 
-  const claimMissionReward = async (missionProgressId: string, pointsBonus: number) => {
+  const claimMissionReward = async (
+    missionProgressId: string,
+    pointsBonus: number
+  ) => {
     try {
       setClaimingMission(missionProgressId);
 
@@ -390,6 +400,20 @@ const Home = () => {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
+
+      // Call function to add points and XP
+      const { error: rewardError } = await (supabase as any).rpc(
+        "add_user_points_and_xp",
+        {
+          p_user_id: user.id,
+          p_amount: pointsBonus,
+          p_source: "mission",
+          p_reference_id: missionProgressId,
+          p_description: "Mission completed reward",
+        }
+      );
+
+      if (rewardError) throw rewardError;
 
       // Update mission progress to claimed
       const { error: updateError } = await supabase
@@ -403,19 +427,8 @@ const Home = () => {
 
       if (updateError) throw updateError;
 
-      // Update user points
-      const { error: pointsError } = await supabase
-        .from("profiles")
-        .update({
-          points: (profile?.points || 0) + pointsBonus,
-        })
-        .eq("user_id", user.id);
+      toast.success(`🎉 Selamat! Kamu mendapat ${pointsBonus} poin dan XP!`);
 
-      if (pointsError) throw pointsError;
-
-      toast.success(`🎉 Selamat! Kamu mendapat ${pointsBonus} poin!`);
-
-      // Refresh data
       await fetchProfile();
       await fetchMissions();
     } catch (error: any) {
@@ -441,16 +454,16 @@ const Home = () => {
 
   const getTimeRemaining = (expiresAt?: string | null) => {
     if (!expiresAt) return null;
-    
+
     const now = new Date();
     const expiry = new Date(expiresAt);
     const diff = expiry.getTime() - now.getTime();
-    
+
     if (diff <= 0) return "Expired";
-    
+
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     if (hours >= 24) {
       const days = Math.floor(hours / 24);
       return `${days} hari lagi`;
@@ -459,6 +472,24 @@ const Home = () => {
     } else {
       return `${minutes} menit lagi`;
     }
+  };
+
+  const getMonthName = () => {
+    const months = [
+      "Januari",
+      "Februari",
+      "Maret",
+      "April",
+      "Mei",
+      "Juni",
+      "Juli",
+      "Agustus",
+      "September",
+      "Oktober",
+      "November",
+      "Desember",
+    ];
+    return months[new Date().getMonth()];
   };
 
   if (isLoading) {
@@ -478,7 +509,9 @@ const Home = () => {
               <Leaf className="w-7 h-7 text-white" />
             </div>
             <div>
-              <p className="text-white/80 text-sm font-medium">Selamat Datang</p>
+              <p className="text-white/80 text-sm font-medium">
+                Selamat Datang
+              </p>
               <p className="text-white text-xl font-bold">
                 {profile?.username || "Pengguna"}
               </p>
@@ -488,50 +521,47 @@ const Home = () => {
         </div>
       </div>
 
-      {/* ================= FLOATING POINT CARD ================= */}
+      {/* ================= DUAL BALANCE CARDS ================= */}
       <div className="-mt-20 px-6 relative z-20">
-        <div className="bg-card/80 backdrop-blur-xl rounded-3xl shadow-2xl p-6 border border-white/20 dark:border-white/10 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
+        <div className="bg-card/90 backdrop-blur-xl rounded-3xl shadow-2xl p-6 border border-green-200 dark:border-green-800 relative overflow-hidden">          {/* Poin + XP (Single Card) */}
           <div className="relative z-10">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-start">
+              {/* Poin Permanen */}
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Trophy className="w-4 h-4 text-primary" />
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Total Poin
-                  </p>
-                </div>
-                <p className="text-5xl font-black text-primary mb-2 tracking-tight">
-                  {profile?.points || 0}
+                <p className="text-gray-500 text-sm font-medium mb-1">
+                  Total Poin Anda
                 </p>
-                <div className="flex items-center gap-2 bg-green-500/10 dark:bg-green-400/10 px-3 py-1.5 rounded-full w-fit">
-                  <TrendingUp className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
-                  <p className="text-xs font-semibold text-green-600 dark:text-green-400">
-                    +{weeklyPoints} minggu ini
+                <p className="text-5xl font-black text-green-600 mb-2 tracking-tight">
+                  {profile?.points?.toLocaleString() || 0}
+                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-green-600 text-sm font-semibold">
+                    +{weeklyXP} poin minggu ini
                   </p>
                 </div>
               </div>
+
+              {/* XP Badge */}
               <button
                 onClick={() => navigate("/leaderboard")}
-                className="flex flex-col items-center gap-2 hover:scale-110 transition-transform"
+                className="flex flex-col items-center gap-2 hover:scale-105 transition-transform"
               >
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-[#1DBF73] flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow">
-                  <Award className="w-9 h-9 text-white" />
+                <div className="w-20 h-20 rounded-3xl bg-card/90 flex items-center justify-center shadow-md">
+                  <Trophy className="w-9 h-9 text-green-600" />
                 </div>
-                <p className="text-xs font-bold text-foreground text-center cursor-pointer hover:text-primary transition-colors">
-                  Rank #{profile?.rank || "-"}
+                <p className="text-green-600 text-sm font-bold">
+                  XP {profile?.xp?.toLocaleString() || 0}
                 </p>
               </button>
             </div>
           </div>
         </div>
       </div>
-
       {/* ================= MISI HARIAN ================= */}
       {missions.length > 0 && (
         <div className="px-6 mt-8 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-foreground">Misi Harian</h2>
+            <h2 className="text-xl font-bold text-foreground">Daftar Misi</h2>
             <button
               onClick={() => navigate("/missions")}
               className="text-primary text-sm font-semibold hover:text-primary/80"
@@ -695,7 +725,9 @@ const Home = () => {
       {/* ================= AKTIVITAS TERBARU ================= */}
       <div className="px-6 mt-8 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-foreground">Aktivitas Terbaru</h2>
+          <h2 className="text-xl font-bold text-foreground">
+            Aktivitas Terbaru
+          </h2>
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
             <Clock className="w-4 h-4 text-primary" />
           </div>

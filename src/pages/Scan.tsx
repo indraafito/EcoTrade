@@ -30,13 +30,11 @@ const QR_CONFIG = {
   
   // Parse QR data
   parseQRData: (qrText: string): QRData | null => {
-    console.log('🔧 Parsing QR data:', qrText);
-    
+        
     // Try to parse as JSON first
     try {
       const jsonData = JSON.parse(qrText);
-      console.log('📝 QR data is JSON format:', jsonData);
-      
+            
       // Check if it has required fields
       if (jsonData.locationId && jsonData.locationName && jsonData.timestamp) {
         const qrData = {
@@ -45,15 +43,12 @@ const QR_CONFIG = {
           timestamp: jsonData.timestamp
         };
         
-        console.log('✅ QR data parsed successfully (JSON):', qrData);
-        return qrData;
+                return qrData;
       } else {
-        console.log('❌ JSON QR data missing required fields');
-        return null;
+                return null;
       }
     } catch (jsonError) {
-      console.log('📝 QR data is not JSON, trying string format...');
-    }
+          }
     
     // Try string format
     const match = qrText.match(QR_CONFIG.QR_PATTERN);
@@ -64,15 +59,10 @@ const QR_CONFIG = {
         timestamp: new Date(parseInt(match[3]) * 1000).toISOString()
       };
       
-      console.log('✅ QR data parsed successfully (string):', qrData);
-      return qrData;
+            return qrData;
     }
     
-    console.log('❌ QR pattern does not match EcoTrade format');
-    console.log('🔍 Expected formats:');
-    console.log('  - String: ecotrade:location:{uuid}:{name}:{timestamp}');
-    console.log('  - JSON: {"locationId":"{uuid}","locationName":"{name}","timestamp":"{iso}"}');
-    return null;
+                    return null;
   }
 };
 
@@ -176,13 +166,10 @@ const ScanPage = () => {
     }
     
     console.log('🔒 Secure context check passed');
-    console.log('🌐 Protocol:', location.protocol);
-    console.log('🏠 Hostname:', location.hostname);
-    console.log('🔒 Is Secure Context:', window.isSecureContext);
-    
+                    
     const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
     console.log('📸 Camera permission state:', result.state);
-    
+        
     // Allow 'prompt' state - user can still grant permission
     if (result.state === 'denied') {
       setErrorMessage("Izin kamera ditolak. Silakan berikan izin kamera di pengaturan browser Anda.");
@@ -195,7 +182,6 @@ const ScanPage = () => {
     setHasPermission(result.state === 'granted');
     return true; // Allow camera access attempt
   } catch (error) {
-    console.error('Error checking camera permission:', error);
     // Fallback: try to access camera directly
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -241,7 +227,7 @@ const startCamera = async () => {
     });
 
     console.log('Camera stream obtained:', stream);
-
+    
     // Set camera active state first to ensure video ref is available
     setCameraActive(true);
     
@@ -507,25 +493,17 @@ const startRealQRScanning = async () => {
       });
 
       if (code) {
-        console.log('🎯 Real QR code detected with JavaScript:', code.data);
-        console.log('📝 QR Data length:', code.data.length);
-        console.log('📝 QR Data type:', typeof code.data);
-        
+                                
         // Check if it's an EcoTrade QR code (JSON or string format)
         const isEcoTradeQR = code.data.startsWith('ecotrade:location:') || 
                             code.data.includes('"locationId"') || 
                             code.data.includes('locationId');
         
-        console.log('🏷️ Is EcoTrade QR:', isEcoTradeQR);
-        
+                
         if (isEcoTradeQR) {
           handleQRDetection(code.data);
         } else {
-          console.log('❌ Not an EcoTrade QR code');
-          console.log('🔍 Expected EcoTrade formats:');
-          console.log('  - String: ecotrade:location:{uuid}:{name}:{timestamp}');
-          console.log('  - JSON: {"locationId":"{uuid}","locationName":"{name}","timestamp":"{iso}"}');
-          
+                                                  
           // Show error dialog for non-EcoTrade QR codes
           setErrorMessage("QR Code yang Anda pindai bukan QR Code resmi EcoTrade. Pastikan Anda memindai QR Code dari lokasi penimbunan resmi EcoTrade.");
           setShowErrorDialog(true);
@@ -654,9 +632,16 @@ const simulateQRScan = async () => {
     console.log('  - isProcessing:', isProcessing);
     console.log('  - confirmDisposalRef.current:', confirmDisposalRef.current);
     console.log('  - scanResult exists:', !!scanResult);
+    console.log('  - scanResult data:', scanResult);
+    console.log('  - Timestamp:', new Date().toISOString());
+    console.log('  - Execution ID:', Math.random().toString(36).substr(2, 9));
     
     if (!scanResult || isProcessing || confirmDisposalRef.current) {
       console.log('🚫 confirmDisposal BLOCKED - Early return');
+      console.log('  - Block reasons:');
+      console.log('    - scanResult missing:', !scanResult);
+      console.log('    - isProcessing:', isProcessing);
+      console.log('    - confirmDisposalRef.current:', confirmDisposalRef.current);
       return;
     }
 
@@ -666,24 +651,38 @@ const simulateQRScan = async () => {
     setIsProcessing(true);
 
     try {
-      // Add small delay to prevent double-clicks
+      console.log('⏱️ Adding 300ms delay to prevent double-clicks...');
       await new Promise(resolve => setTimeout(resolve, 300));
+      console.log('⏱️ Delay completed, continuing...');
       
+      console.log('🔐 Getting user authentication...');
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User tidak ditemukan");
+      if (!user) {
+        console.error('❌ User not found - throwing error');
+        throw new Error("User tidak ditemukan");
+      }
+      console.log('✅ User authenticated:', user.id);
 
       const weightKg = scanResult.bottles * 0.025;
       const pointsEarned = scanResult.bottles * 10;
+      
+      console.log('📊 Calculated values:');
+      console.log('  - Weight (kg):', weightKg);
+      console.log('  - Points Earned:', pointsEarned);
+      console.log('  - Bottle count:', scanResult.bottles);
 
-      console.log('📊 Saving activity data:');
+      console.log('🚀 === SCAN TO DATABASE FLOW START ===');
+      console.log('📊 SCAN DATA TO INSERT:');
       console.log('  - User ID:', user.id);
       console.log('  - Location ID:', scanResult.location.id);
+      console.log('  - Location Name:', scanResult.location.name);
       console.log('  - Bottles Count:', scanResult.bottles);
       console.log('  - Weight Kg:', weightKg);
       console.log('  - Points Earned:', pointsEarned);
       console.log('  - Timestamp:', new Date().toISOString());
       console.log('  - Execution ID:', Math.random().toString(36).substr(2, 9));
 
+      console.log('📤 INSERTING INTO ACTIVITIES TABLE...');
       const { data: activityData, error: activityError } = await supabase.from("activities").insert({
         user_id: user.id,
         location_id: scanResult.location.id,
@@ -692,9 +691,16 @@ const simulateQRScan = async () => {
         points_earned: pointsEarned,
       }).select().single();
 
-      if (activityError) throw activityError;
+      if (activityError) {
+        console.error('❌ ACTIVITY INSERT FAILED:', activityError);
+        throw activityError;
+      }
 
-      console.log('✅ Activity saved successfully:', activityData);
+      console.log('✅ ACTIVITY INSERT SUCCESSFUL!');
+      console.log('📋 INSERTED ACTIVITY DATA:', activityData);
+      console.log('  - Activity ID:', activityData.id);
+      console.log('  - Created At:', activityData.created_at);
+      console.log('  - All Fields:', JSON.stringify(activityData, null, 2));
 
       // Small delay to ensure activity is committed to database
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -712,7 +718,67 @@ const simulateQRScan = async () => {
       if (profileBeforeError) {
         console.error('❌ Error fetching profile before:', profileBeforeError);
       } else {
-        console.log('📋 Profile BEFORE activity fetch:', profileBefore);
+        console.log('🔍 === DOUBLE INCREMENT DETECTION START ===');
+        console.log('📊 SCENARIO: 1 botol = 10 poin (expected)');
+        console.log('📋 PROFILE SEBELUM SCAN:');
+        console.log('  - Points Sebelum:', profileBefore.points);
+        console.log('  - Bottles Sebelum:', profileBefore.total_bottles);
+        console.log('  - Weight Sebelum:', profileBefore.total_weight_kg);
+        console.log('');
+        
+        console.log('📈 YANG DIHARAPKAN DARI SCAN INI:');
+        console.log('  - Bottles: +', scanResult.bottles);
+        console.log('  - Points: +', pointsEarned, '(harusnya 10 poin per botol)');
+        console.log('  - Weight: +', weightKg, 'kg');
+        console.log('');
+        
+        console.log('🎯 EXPECTED TOTAL SETELAH SCAN:');
+        console.log('  - Expected Points:', (profileBefore.points || 0) + pointsEarned);
+        console.log('  - Expected Bottles:', (profileBefore.total_bottles || 0) + scanResult.bottles);
+        console.log('  - Expected Weight:', (profileBefore.total_weight_kg || 0) + weightKg);
+        console.log('');
+        
+        // Calculate what the profile should be BEFORE any triggers
+        const expectedBeforeTrigger = {
+          points: (profileBefore.points || 0),
+          bottles: (profileBefore.total_bottles || 0),
+          weight: (profileBefore.total_weight_kg || 0)
+        };
+        
+        // Calculate what the profile should be AFTER this scan (without triggers)
+        const expectedAfterScan = {
+          points: expectedBeforeTrigger.points + pointsEarned,
+          bottles: expectedBeforeTrigger.bottles + scanResult.bottles,
+          weight: expectedBeforeTrigger.weight + weightKg
+        };
+        
+        console.log('🔍 TRIGGER ANALYSIS:');
+        console.log('  - Profile saat ini (mungkin sudah di-trigger):', profileBefore);
+        console.log('  - Expected sebelum trigger:', expectedBeforeTrigger);
+        console.log('  - Expected setelah scan (no trigger):', expectedAfterScan);
+        console.log('');
+        
+        // DETECT IF TRIGGER ALREADY RAN
+        const triggerAlreadyRan = profileBefore.points > expectedBeforeTrigger.points;
+        const triggerPointsAdded = profileBefore.points - expectedBeforeTrigger.points;
+        
+        if (triggerAlreadyRan) {
+          console.log('🚨 TRIGGER SUDAH BERJALAN!');
+          console.log('  - Trigger menambahkan:', triggerPointsAdded, 'poin');
+          console.log('  - Expected trigger addition:', pointsEarned, 'poin');
+          console.log('  - Double increment?', triggerPointsAdded > pointsEarned ? 'YA ❌' : 'TIDAK ✅');
+          
+          if (triggerPointsAdded > pointsEarned) {
+            console.log('💀 DOUBLE INCREMENT DETECTED!');
+            console.log('  - Seharusnya ditambahkan:', pointsEarned, 'poin');
+            console.log('  - Trigger menambahkan:', triggerPointsAdded, 'poin');
+            console.log('  - Kelebihan:', triggerPointsAdded - pointsEarned, 'poin');
+            console.log('  - Penyebab: Database trigger atau concurrent update');
+          }
+        } else {
+          console.log('✅ Trigger belum berjalan (normal)');
+        }
+        console.log('');
         
         // Check if profile was already updated by trigger
         const expectedFromTrigger = {
@@ -721,19 +787,29 @@ const simulateQRScan = async () => {
           weight: (profileBefore.total_weight_kg || 0) - weightKg
         };
         
-        console.log('🔍 Trigger detection:');
-        console.log('  - Profile after trigger:', profileBefore);
-        console.log('  - Expected before trigger:', expectedFromTrigger);
-        console.log('  - Difference from trigger:', {
+        console.log('🔍 MANUAL UPDATE VS TRIGGER CHECK:');
+        console.log('  - Current profile:', profileBefore);
+        console.log('  - If trigger ran, should be:', expectedFromTrigger);
+        console.log('  - Difference from expected:', {
           points: profileBefore.points - expectedFromTrigger.points,
           bottles: profileBefore.total_bottles - expectedFromTrigger.bottles,
           weight: profileBefore.total_weight_kg - expectedFromTrigger.weight
         });
+        console.log('');
         
         // If profile already updated by trigger, skip manual update
         if (profileBefore.points >= pointsEarned && 
             profileBefore.total_bottles >= scanResult.bottles) {
-          console.log('✅ Profile already updated by trigger - skipping manual update');
+          console.log('⚠️ Profile sudah di-update oleh trigger - skip manual update');
+          console.log('🎯 FINAL RESULT (Trigger Only):');
+          console.log('  - Final Points:', profileBefore.points);
+          console.log('  - Final Bottles:', profileBefore.total_bottles);
+          console.log('  - Final Weight:', profileBefore.total_weight_kg);
+          console.log('  - Points Added by Trigger:', triggerPointsAdded);
+          console.log('  - Double Increment?', triggerPointsAdded > pointsEarned ? 'YA ❌' : 'TIDAK ✅');
+          console.log('');
+          console.log('🔍 === DOUBLE INCREMENT ANALYSIS COMPLETE ===');
+          
           toast.success(`+${pointsEarned} poin! Terima kasih telah berkontribusi!`);
           setShowConfirmDialog(false);
           setScanResult(null);
@@ -772,6 +848,15 @@ const simulateQRScan = async () => {
       console.log('  - Total weight from activities:', totalWeight);
       console.log('  - Current activity: +', scanResult.bottles, 'bottles, +', pointsEarned, 'points, +', weightKg, 'kg');
 
+      console.log('📈 === PROFILE UPDATE FLOW START ===');
+      console.log('📤 UPDATING PROFILE TABLE...');
+      console.log('📊 PROFILE UPDATE DATA:');
+      console.log('  - User ID:', user.id);
+      console.log('  - Total Points:', totalPoints);
+      console.log('  - Total Bottles:', totalBottles);
+      console.log('  - Total Weight:', totalWeight);
+      console.log('  - Calculation based on:', allActivities.length, 'activities');
+
       const { data: updatedProfile, error: updateError } = await supabase
         .from("profiles")
         .update({
@@ -784,11 +869,26 @@ const simulateQRScan = async () => {
         .single();
 
         if (updateError) {
-          console.error('❌ Profile update error:', updateError);
+          console.error('❌ PROFILE UPDATE FAILED:', updateError);
+          console.error('❌ Error details:', JSON.stringify(updateError, null, 2));
           // Continue even if profile update fails - activity was saved
           console.log('⚠️ Activity saved but profile update failed - User can continue');
         } else {
-          console.log('✅ Profile updated successfully based on activities:', updatedProfile);
+          console.log('✅ PROFILE UPDATE SUCCESSFUL!');
+          console.log('📋 UPDATED PROFILE DATA:', updatedProfile);
+          console.log('  - Profile ID:', updatedProfile.id);
+          console.log('  - New Points:', updatedProfile.points);
+          console.log('  - New Total Bottles:', updatedProfile.total_bottles);
+          console.log('  - New Total Weight:', updatedProfile.total_weight_kg);
+          console.log('  - Updated At:', updatedProfile.updated_at);
+          
+          console.log('🎯 FINAL RESULT (Manual Update):');
+          console.log('  - Final Points:', updatedProfile.points);
+          console.log('  - Final Bottles:', updatedProfile.total_bottles);
+          console.log('  - Final Weight:', updatedProfile.total_weight_kg);
+          console.log('  - Points Added:', pointsEarned);
+          console.log('  - Bottles Added:', scanResult.bottles);
+          console.log('  - Weight Added:', weightKg, 'kg');
           
           // Check if there's a discrepancy (possible trigger)
           const expectedBottles = totalBottles;
@@ -800,9 +900,19 @@ const simulateQRScan = async () => {
             console.log('  - Actual bottles:', actualBottles);
             console.log('  - Difference:', actualBottles - expectedBottles);
             console.log('  - Possible cause: Database trigger or concurrent update');
+          } else {
+            console.log('✅ NO DISCREPANCY - Profile matches expected values');
           }
           
-          console.log('🎯 Final result - Profile now reflects ALL activities correctly');
+          console.log('🎯 === SCAN TO DATABASE FLOW COMPLETE ===');
+          console.log('📊 FINAL SUMMARY:');
+          console.log('  - Activity ID:', activityData.id);
+          console.log('  - Activity saved: ✅');
+          console.log('  - Profile updated: ✅');
+          console.log('  - Final bottles:', updatedProfile.total_bottles);
+          console.log('  - Final points:', updatedProfile.points);
+          console.log('  - Final weight:', updatedProfile.total_weight_kg);
+          console.log('🎉 PENAMBAHAN POIN BERHASIL!');
         }
 
       toast.success(`+${pointsEarned} poin! Terima kasih telah berkontribusi!`);
@@ -1057,16 +1167,29 @@ const simulateQRScan = async () => {
           <DialogFooter className="gap-2">
             <Button 
               onClick={() => {
-                console.log('🔘 Konfirmasi button clicked!');
+                console.log('🔘🔘🔘 BUTTON CLICKED!!!');
+                alert('Button clicked! Check console for details.');
+                
+                console.log('🔘 === KONFIRMASI BUTTON CLICKED ===');
                 console.log('  - Current isProcessing:', isProcessing);
                 console.log('  - confirmDisposalRef.current:', confirmDisposalRef.current);
-                console.log('  - ScanResult:', scanResult);
+                console.log('  - ScanResult exists:', !!scanResult);
+                console.log('  - ScanResult data:', scanResult);
+                console.log('  - Button disabled:', isProcessing);
                 console.log('  - Timestamp:', new Date().toISOString());
                 console.log('  - Execution ID:', Math.random().toString(36).substr(2, 9));
-                confirmDisposal();
+                console.log('  - About to call confirmDisposal()...');
+                console.log('🔘 === STARTING confirmDisposal FUNCTION ===');
+                
+                // Add immediate call to confirmDisposal
+                confirmDisposal().then(() => {
+                  console.log('🔘 confirmDisposal() completed successfully');
+                }).catch((error) => {
+                  console.error('🔘 confirmDisposal() failed:', error);
+                });
               }} 
               disabled={isProcessing}
-              className="flex-1 h-12 rounded-xl font-semibold"
+              className="flex-1 h-12 rounded-xl font-semibold bg-red-500 hover:bg-red-600"
             >
               {isProcessing ? "Memproses..." : "Konfirmasi"}
             </Button>

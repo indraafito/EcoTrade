@@ -27,8 +27,7 @@ export const generateLocationQRCodeAPI = async (location: {
     
     return qrCodeUrl;
   } catch (error) {
-    console.error('Error generating QR code:', error);
-    throw error;
+        throw error;
   }
 };
 
@@ -53,8 +52,7 @@ export const saveLocationQRCode = async (
 
     if (existingQR) {
       // QR already exists, no need to insert
-      console.log('QR Code already exists for location:', locationId);
-      return { success: true, isNew: false };
+            return { success: true, isNew: false };
     }
 
     // Use upsert to handle duplicates gracefully
@@ -72,21 +70,17 @@ export const saveLocationQRCode = async (
     if (error) {
       // Check if it's a duplicate error
       if (error.code === '23505' && error.message.includes('duplicate key')) {
-        console.log('QR Code already exists for location:', locationId);
-        return { success: true, isNew: false }; // Not an error, QR already exists
+                return { success: true, isNew: false }; // Not an error, QR already exists
       }
-      console.error('Error saving QR code:', error);
-      return { success: false, isNew: false };
+            return { success: false, isNew: false };
     }
 
     return { success: true, isNew: true }; // New QR created
   } catch (error: any) {
-    console.error('Error in saveLocationQRCode:', error);
-    
+        
     // Check if it's a duplicate error
     if (error.code === '23505' && error.message.includes('duplicate key')) {
-      console.log('QR Code already exists for location:', locationId);
-      return { success: true, isNew: false }; // Not an error, QR already exists
+            return { success: true, isNew: false }; // Not an error, QR already exists
     }
     
     return { success: false, isNew: false };

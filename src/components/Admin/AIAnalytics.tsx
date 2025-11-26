@@ -71,8 +71,8 @@ const AIAnalytics: React.FC<AIAnalyticsProps> = ({
           if (saved) {
             console.log('Saved insights to database:', saved);
           }
-        } catch (error) {
-          console.error('Failed to save insights to database:', error);
+        } catch (error) {console
+          .error('Failed to save insights to database:', error);
         }
       }
     };

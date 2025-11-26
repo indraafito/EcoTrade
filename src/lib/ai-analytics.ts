@@ -4,8 +4,6 @@
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 // Debug: Check if API key is loaded
-console.log('Gemini API Key loaded:', GEMINI_API_KEY ? 'YES' : 'NO');
-console.log('Environment check:', import.meta.env.MODE);
 
 interface AIResponse {
   success: boolean;
@@ -17,9 +15,7 @@ export const callGeminiAPI = async (prompt: string): Promise<AIResponse> => {
   try {
     // Check if API key is available
     if (!GEMINI_API_KEY) {
-      console.error('Gemini API key not found in environment variables');
-      console.log('Available env vars:', Object.keys(import.meta.env).filter(key => key.includes('GEMINI')));
-      return {
+                  return {
         success: false,
         error: 'API key not configured'
       };
@@ -44,8 +40,7 @@ export const callGeminiAPI = async (prompt: string): Promise<AIResponse> => {
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('Gemini API Error:', errorData);
-      return {
+            return {
         success: false,
         error: `API Error: ${response.status} - ${errorData}`
       };
@@ -67,8 +62,7 @@ export const callGeminiAPI = async (prompt: string): Promise<AIResponse> => {
     };
     
   } catch (error) {
-    console.error('AI Analytics API Error:', error);
-    return {
+        return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
     };

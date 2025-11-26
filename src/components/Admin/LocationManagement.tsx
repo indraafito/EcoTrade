@@ -67,27 +67,47 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
 
   const fetchLocations = async () => {
     try {
-      const { data, error } = await (supabase as any)
+            
+      // Fetch locations without join first
+      const { data: locationsData, error: locationsError } = await supabase
         .from("locations")
-        .select(`
-          *,
-          location_qr_codes (
-            qr_code_url
-          )
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      
-      // Flatten QR code URL into location object
-      const locationsWithQR = (data || []).map((location: any) => ({
-        ...location,
-        qr_code_url: location.location_qr_codes?.[0]?.qr_code_url || null
-      }));
+      console.log('🔍 Locations response:', { data: locationsData, error: locationsError });
+
+      if (locationsError) {
+        console.error('❌ Database error:', locationsError);
+        throw locationsError;
+      }
+
+      // Fetch QR codes separately
+      const { data: qrCodesData, error: qrCodesError } = await (supabase as any)
+        .from("location_qr_codes")
+        .select("location_id, qr_code_url");
+
+      console.log('🔍 QR codes response:', { data: qrCodesData, error: qrCodesError });
+
+      if (qrCodesError) {
+        console.error('❌ QR codes error:', qrCodesError);
+        // Continue without QR codes
+      }
+
+      // Merge QR codes into locations
+      const locationsWithQR = (locationsData || []).map((location: any) => {
+        const qrCode = (qrCodesData as any[])?.find((qr: any) => qr.location_id === location.id);
+        return {
+          ...location,
+          qr_code_url: qrCode?.qr_code_url || null
+        };
+      });
       
       setLocations(locationsWithQR);
+      console.log('🔍 Locations set:', locationsWithQR);
+      console.log('🔍 Locations count:', locationsWithQR.length);
       if (onLocationChange) onLocationChange();
     } catch (error: any) {
+      console.error('❌ Error fetching locations:', error);
       toast.error("Gagal memuat data lokasi: " + error.message);
     } finally {
       setIsLoading(false);
