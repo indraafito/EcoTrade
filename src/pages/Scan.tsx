@@ -135,23 +135,68 @@ const ScanPage = () => {
 
   const checkCameraPermission = async (): Promise<boolean> => {
   try {
+    // Check if running in secure context (HTTPS in production)
+    if (!window.isSecureContext && location.hostname !== 'localhost') {
+      console.warn('Camera access requires HTTPS in production');
+      setErrorMessage("Akses kamera memerlukan koneksi HTTPS yang aman. Pastikan Anda mengakses aplikasi melalui URL HTTPS yang resmi.");
+      setShowErrorDialog(true);
+      return false;
+    }
+    
+    console.log('🔒 Secure context check passed');
+    console.log('🌐 Protocol:', location.protocol);
+    console.log('🏠 Hostname:', location.hostname);
+    console.log('🔒 Is Secure Context:', window.isSecureContext);
+    
     const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
+    console.log('📸 Camera permission state:', result.state);
+    
+    // Allow 'prompt' state - user can still grant permission
+    if (result.state === 'denied') {
+      setErrorMessage("Izin kamera ditolak. Silakan berikan izin kamera di pengaturan browser Anda.");
+      setShowErrorDialog(true);
+      setHasPermission(false);
+      return false;
+    }
+    
+    // For 'granted' or 'prompt' state, try to access camera
     setHasPermission(result.state === 'granted');
-    return result.state === 'granted';
+    return true; // Allow camera access attempt
   } catch (error) {
     console.error('Error checking camera permission:', error);
-    return false;
+    // Fallback: try to access camera directly
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      stream.getTracks().forEach(track => track.stop());
+      console.log('✅ Camera access granted via fallback');
+      setHasPermission(true);
+      return true;
+    } catch (fallbackError) {
+      console.error('Camera access denied:', fallbackError);
+      setErrorMessage("Aplikasi membutuhkan izin kamera untuk memandai QR Code. Silakan berikan izin kamera di pengaturan browser dan pastikan menggunakan koneksi HTTPS.");
+      setShowErrorDialog(true);
+      return false;
+    }
   }
 };
 
 const startCamera = async () => {
   try {
+    console.log('🚀 Starting camera...');
+    console.log('🌍 Environment:', {
+      isProduction: import.meta.env.PROD,
+      isDev: import.meta.env.DEV,
+      protocol: location.protocol,
+      hostname: location.hostname,
+      isSecure: window.isSecureContext
+    });
+    
     // Check camera permission first
     const hasPermission = await checkCameraPermission();
     if (!hasPermission) {
-      setErrorMessage("Aplikasi membutuhkan izin kamera untuk memindai QR Code. Silakan berikan izin kamera di pengaturan browser.");
-      setShowErrorDialog(true);
-      return;
+      return; // Error dialog already shown in checkCameraPermission
     }
 
     // Start camera stream
