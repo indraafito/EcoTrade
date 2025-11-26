@@ -36,7 +36,7 @@ export const generateLocationQRCodeAPI = async (location: {
 export const saveLocationQRCode = async (
   locationId: string,
   qrCodeUrl: string
-): Promise<boolean> => {
+): Promise<{ success: boolean; isNew: boolean }> => {
   try {
     const qrData: LocationQRData = {
       locationId: locationId,
@@ -44,6 +44,20 @@ export const saveLocationQRCode = async (
       timestamp: new Date().toISOString()
     };
 
+    // First check if QR code already exists
+    const { data: existingQR } = await (supabase as any)
+      .from('location_qr_codes')
+      .select('qr_code_url')
+      .eq('location_id', locationId)
+      .single();
+
+    if (existingQR) {
+      // QR already exists, no need to insert
+      console.log('QR Code already exists for location:', locationId);
+      return { success: true, isNew: false };
+    }
+
+    // Use upsert to handle duplicates gracefully
     const { error } = await (supabase as any)
       .from('location_qr_codes')
       .upsert({
@@ -51,16 +65,30 @@ export const saveLocationQRCode = async (
         qr_code_url: qrCodeUrl,
         qr_data: qrData,
         updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'location_id' // Handle conflict on location_id
       });
 
     if (error) {
+      // Check if it's a duplicate error
+      if (error.code === '23505' && error.message.includes('duplicate key')) {
+        console.log('QR Code already exists for location:', locationId);
+        return { success: true, isNew: false }; // Not an error, QR already exists
+      }
       console.error('Error saving QR code:', error);
-      return false;
+      return { success: false, isNew: false };
     }
 
-    return true;
-  } catch (error) {
+    return { success: true, isNew: true }; // New QR created
+  } catch (error: any) {
     console.error('Error in saveLocationQRCode:', error);
-    return false;
+    
+    // Check if it's a duplicate error
+    if (error.code === '23505' && error.message.includes('duplicate key')) {
+      console.log('QR Code already exists for location:', locationId);
+      return { success: true, isNew: false }; // Not an error, QR already exists
+    }
+    
+    return { success: false, isNew: false };
   }
 };

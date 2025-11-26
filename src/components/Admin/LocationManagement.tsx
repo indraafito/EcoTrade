@@ -170,6 +170,14 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
 
   const showQRCode = async (location: Location) => {
     try {
+      // Check if QR code already exists
+      if (location.qr_code_url) {
+        // QR code already exists, just show dialog
+        setSelectedQRLocation(location);
+        setQrDialogOpen(true);
+        return;
+      }
+
       // Set selected location immediately for UI feedback
       setSelectedQRLocation(location);
       setQrDialogOpen(true);
@@ -187,17 +195,36 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
             name: location.name
           });
           
-          // Save to database
-          const saved = await saveLocationQRCode(location.id, qrCodeUrl);
+          // Save to database with upsert (will handle duplicates gracefully)
+          const result = await saveLocationQRCode(location.id, qrCodeUrl);
           
-          if (saved) {
+          if (result.success) {
             // Update dialog with QR code
             const finalLocation = { ...location, qr_code_url: qrCodeUrl };
             setSelectedQRLocation(finalLocation);
             fetchLocations(); // Refresh list
-            toast.success('QR Code berhasil dibuat');
+            
+            // Only show toast if QR is newly created
+            if (result.isNew) {
+              toast.success('QR Code berhasil dibuat');
+            }
           } else {
-            toast.error('QR Code gagal disimpan');
+            // Check if QR code already exists in database
+            const { data: existingQR } = await (supabase as any)
+              .from('location_qr_codes')
+              .select('qr_code_url')
+              .eq('location_id', location.id)
+              .single();
+            
+            if (existingQR) {
+              // QR code exists, update UI
+              const finalLocation = { ...location, qr_code_url: existingQR.qr_code_url };
+              setSelectedQRLocation(finalLocation);
+              fetchLocations(); // Refresh list
+              // Tidak perlu toast karena QR sudah ada di database
+            } else {
+              toast.error('QR Code gagal disimpan');
+            }
           }
         } catch (error) {
           console.error('Error generating QR:', error);
