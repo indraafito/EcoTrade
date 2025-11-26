@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Gift, MapPin, Users, Recycle, LogOut, UserCog, Settings, Activity, Calendar } from "lucide-react";
+import { Gift, MapPin, Users, Recycle, LogOut, Activity, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import LocationManagement from "@/components/Admin/LocationManagement";
 import VoucherManagement from "@/components/Admin/VoucherManagement";
@@ -374,10 +374,6 @@ const AdminDashboard = () => {
               <Activity className="h-4 w-4" />
               <span>Analitik</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              <span>Pengaturan</span>
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="locations" className="mt-6">
@@ -559,36 +555,6 @@ const AdminDashboard = () => {
                   />
                 </div>
               </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="settings" className="mt-6">
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold">Pengaturan</h2>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button 
-                    onClick={refreshData}
-                    className="w-full justify-start"
-                    variant="outline"
-                  >
-                    <Activity className="mr-2 h-4 w-4" />
-                    Refresh Data
-                  </Button>
-                  <Button 
-                    onClick={() => window.open('/home', '_blank')}
-                    className="w-full justify-start"
-                    variant="outline"
-                  >
-                    <Users className="mr-2 h-4 w-4" />
-                    Buka Aplikasi User
-                  </Button>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
         </Tabs>
