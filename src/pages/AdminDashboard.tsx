@@ -11,9 +11,11 @@ import { Gift, MapPin, Users, Recycle, LogOut, UserCog, Settings, Activity, Cale
 import { toast } from "sonner";
 import LocationManagement from "@/components/Admin/LocationManagement";
 import VoucherManagement from "@/components/Admin/VoucherManagement";
-import RegistrationChart from "@/components/Admin/RegistrationChart";
+import BottleChart from "@/components/Admin/BottleChart";
+import UserRegistrationChart from "@/components/Admin/UserRegistrationChart";
 import { Badge } from "@/components/ui/badge";
-import { getRegistrationYAxisLabels, formatDate, ChartData } from "@/components/Admin/ChartUtils";
+import { getRegistrationYAxisLabels, getBottleYAxisLabels, formatDate, ChartData } from "@/components/Admin/ChartUtils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Stats {
   totalBottles: number;
@@ -36,12 +38,13 @@ const AdminDashboard = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState({
-    type: 'custom', // 'day', 'week', 'month', 'year', 'custom'
+    type: 'week', // 'week', 'month', 'year', 'custom'
     startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
     endDate: new Date()
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
 
   useEffect(() => {
     checkAdminAccess();
@@ -124,9 +127,6 @@ const AdminDashboard = () => {
     let endDate = new Date();
     
     switch(type) {
-      case 'day':
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        break;
       case 'week':
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         break;
@@ -217,8 +217,7 @@ const AdminDashboard = () => {
   };
   
   const getDataPointsCount = () => {
-    return dateFilter.type === 'day' ? 24 :
-           dateFilter.type === 'week' ? 7 :
+    return dateFilter.type === 'week' ? 7 :
            dateFilter.type === 'month' ? 30 :
            12;
   };
@@ -249,9 +248,7 @@ const AdminDashboard = () => {
   };
 
   const getChartLabels = () => {
-    if (dateFilter.type === 'day') {
-      return Array.from({ length: 24 }, (_, i) => `${i}:00`);
-    } else if (dateFilter.type === 'week') {
+    if (dateFilter.type === 'week') {
       return ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
     } else if (dateFilter.type === 'month') {
       return Array.from({ length: 30 }, (_, i) => i + 1);
@@ -393,50 +390,55 @@ const AdminDashboard = () => {
 
           <TabsContent value="analytics" className="mt-6">
             <div className="space-y-6">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold">Analitik</h2>
                 
-                {/* Date Filter */}
-                <div className="flex gap-2">
-                  <Button
-                    variant={dateFilter.type === 'day' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handleDateFilterChange('day')}
-                  >
-                    Hari ini
-                  </Button>
-                  <Button
-                    variant={dateFilter.type === 'week' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handleDateFilterChange('week')}
-                  >
-                    7 Hari
-                  </Button>
-                  <Button
-                    variant={dateFilter.type === 'month' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handleDateFilterChange('month')}
-                  >
-                    30 Hari
-                  </Button>
-                  <Button
-                    variant={dateFilter.type === 'year' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handleDateFilterChange('year')}
-                  >
-                    Tahun
-                  </Button>
-                  <Button
-                    variant={dateFilter.type === 'custom' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handleDateFilterChange('custom')}
-                  >
-                    <Calendar className="w-4 h-4" />
-                  </Button>
+                {/* Date Filter & Chart Type - Right Side */}
+                <div className="flex items-center gap-2">
+                  {/* Date Filter */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant={dateFilter.type === 'week' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleDateFilterChange('week')}
+                    >
+                      7 Hari
+                    </Button>
+                    <Button
+                      variant={dateFilter.type === 'month' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleDateFilterChange('month')}
+                    >
+                      30 Hari
+                    </Button>
+                    <Button
+                      variant={dateFilter.type === 'year' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleDateFilterChange('year')}
+                    >
+                      Tahun
+                    </Button>
+                    <Button
+                      variant={dateFilter.type === 'custom' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleDateFilterChange('custom')}
+                    >
+                      <Calendar className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  
+                  {/* Chart Type Dropdown */}
+                  <Select value={chartType} onValueChange={(value) => setChartType(value as 'bar' | 'line')}>
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bar">Bar</SelectItem>
+                      <SelectItem value="line">Line</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              
-              {/* Custom Date Range Display */}
               {dateFilter.type === 'custom' && (
                 <div className="bg-muted p-3 rounded-lg">
                   <p className="text-sm font-medium">
@@ -533,14 +535,29 @@ const AdminDashboard = () => {
                 </Dialog>
               )}
               
-              <div className="space-y-4">
-                <RegistrationChart
-                  chartData={chartData}
-                  dateFilter={dateFilter}
-                  stats={stats}
-                  formatDate={formatDate}
-                  getRegistrationYAxisLabels={() => getRegistrationYAxisLabels(chartData)}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Tren Botol Terkumpul</h3>
+                  <BottleChart
+                    chartData={chartData}
+                    dateFilter={dateFilter}
+                    formatDate={formatDate}
+                    getBottleYAxisLabels={() => getBottleYAxisLabels(chartData)}
+                    chartType={chartType}
+                  />
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Pendaftaran Pengguna</h3>
+                  <UserRegistrationChart
+                    chartData={chartData}
+                    dateFilter={dateFilter}
+                    stats={stats}
+                    formatDate={formatDate}
+                    getRegistrationYAxisLabels={() => getRegistrationYAxisLabels(chartData)}
+                    chartType={chartType}
+                  />
+                </div>
               </div>
             </div>
           </TabsContent>
