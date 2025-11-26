@@ -21,6 +21,7 @@ import NotFound from "./pages/NotFound";
 import { DarkModeProvider } from "./components/DarkMode";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import Missions from "./pages/Missions";
+import Leaderboard from "./pages/Leaderboard";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/missions" element={<Missions />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
        </Routes>
       </BrowserRouter>
       </DarkModeProvider>

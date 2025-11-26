@@ -32,6 +32,9 @@ interface Mission {
   status: string;
   difficulty?: string;
   mission_type?: string;
+  expires_at?: string | null;
+  started_at?: string;
+  duration_hours?: number;
 }
 
 const Missions = () => {
@@ -86,11 +89,13 @@ const Missions = () => {
       );
 
       if (newMissions.length > 0) {
+        const now = new Date();
         const progressToCreate = newMissions.map((mission) => ({
           user_id: user.id,
           mission_id: mission.id,
           progress_value: 0,
           status: "in_progress",
+          started_at: now.toISOString(),
         }));
 
         const { error: createError } = await supabase
@@ -134,6 +139,9 @@ const Missions = () => {
             status: progress.status,
             difficulty: mission.difficulty,
             mission_type: mission.mission_type,
+            expires_at: progress.expires_at,
+            started_at: progress.started_at,
+            duration_hours: mission.duration_hours,
           };
         })
         .filter(Boolean) as Mission[];
@@ -240,6 +248,42 @@ const Missions = () => {
         return "Aktivitas";
       default:
         return type;
+    }
+  };
+
+  const getTimeRemaining = (expiresAt?: string | null) => {
+    if (!expiresAt) return null;
+    
+    const now = new Date();
+    const expiry = new Date(expiresAt);
+    const diff = expiry.getTime() - now.getTime();
+    
+    if (diff <= 0) return { text: "Expired", color: "text-red-500" };
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours >= 24) {
+      const days = Math.floor(hours / 24);
+      return { 
+        text: `${days} hari ${hours % 24} jam lagi`,
+        color: "text-green-600 dark:text-green-400"
+      };
+    } else if (hours > 3) {
+      return { 
+        text: `${hours} jam ${minutes} menit lagi`,
+        color: "text-yellow-600 dark:text-yellow-400"
+      };
+    } else if (hours > 0) {
+      return { 
+        text: `${hours} jam ${minutes} menit lagi`,
+        color: "text-orange-500"
+      };
+    } else {
+      return { 
+        text: `${minutes} menit lagi`,
+        color: "text-red-500"
+      };
     }
   };
 
@@ -380,7 +424,7 @@ const Missions = () => {
                       >
                         {getDifficultyIcon(mission.difficulty)}
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <h3 className="font-bold text-foreground">
                           {mission.mission_title}
                         </h3>
@@ -388,6 +432,14 @@ const Missions = () => {
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {mission.description}
                           </p>
+                        )}
+                        {mission.expires_at && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <Clock className="w-3 h-3" />
+                            <p className={`text-xs font-semibold ${getTimeRemaining(mission.expires_at)?.color}`}>
+                              {getTimeRemaining(mission.expires_at)?.text}
+                            </p>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -468,6 +520,24 @@ const Missions = () => {
             </div>
           ))
         )}
+      </div>
+
+      {/* Tips Card */}
+      <div className="px-6 mt-6">
+        <div className="bg-gradient-to-br from-primary/10 to-[#1DBF73]/10 rounded-2xl p-5 border border-primary/20">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h4 className="font-bold text-foreground mb-1">💡 Tips</h4>
+              <p className="text-xs text-muted-foreground">
+                Selesaikan misi untuk mendapatkan poin bonus! Misi akan otomatis
+                update setiap kali kamu melakukan aktivitas daur ulang.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <BottomNav />
