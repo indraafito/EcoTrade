@@ -1,330 +1,741 @@
--- ============================================
--- ECOTRADE COMPLETE DATABASE MIGRATION
--- Version: 2.0
--- Date: 2025
--- ============================================
--- This migration includes:
--- 1. Core tables (profiles, activities, locations, etc)
--- 2. Missions system with duration & expiry
--- 3. Password management & audit
--- 4. Ranking system
--- 5. Vouchers system
--- ============================================
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
 
--- ============================================
--- STEP 1: DROP EXISTING OBJECTS
--- ============================================
 
--- Drop triggers first
-DROP TRIGGER IF EXISTS auto_update_mission_progress ON activities;
-DROP TRIGGER IF EXISTS set_mission_expiry_trigger ON mission_progress;
-DROP TRIGGER IF EXISTS update_mission_progress_updated_at ON mission_progress;
-DROP TRIGGER IF EXISTS update_missions_updated_at ON missions;
-DROP TRIGGER IF EXISTS process_activity_trigger ON activities;
-DROP TRIGGER IF EXISTS activity_mission_progress ON activities;
-DROP TRIGGER IF EXISTS mission_completion_reward ON mission_progress;
-DROP TRIGGER IF EXISTS on_auth_user_created_set_provider ON auth.users;
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
-DROP TRIGGER IF EXISTS update_locations_updated_at ON locations;
-DROP TRIGGER IF EXISTS update_vouchers_updated_at ON vouchers;
-DROP TRIGGER IF EXISTS update_ranking_tiers_updated_at ON ranking_tiers;
+COMMENT ON SCHEMA "public" IS 'standard public schema';
 
--- Drop views
-DROP VIEW IF EXISTS public.leaderboard_view;
-DROP VIEW IF EXISTS public.mission_progress_view;
-DROP VIEW IF EXISTS public.recent_password_resets;
-DROP VIEW IF EXISTS public.user_password_status_summary;
 
--- Drop functions
-DROP FUNCTION IF EXISTS public.update_mission_progress_on_activity() CASCADE;
-DROP FUNCTION IF EXISTS public.set_mission_expiry() CASCADE;
-DROP FUNCTION IF EXISTS public.expire_old_missions() CASCADE;
-DROP FUNCTION IF EXISTS public.claim_mission_reward(UUID) CASCADE;
-DROP FUNCTION IF EXISTS public.update_updated_at_column() CASCADE;
-DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
-DROP FUNCTION IF EXISTS public.apply_ranking_bonus(UUID) CASCADE;
-DROP FUNCTION IF EXISTS public.process_activity() CASCADE;
-DROP FUNCTION IF EXISTS public.update_mission_progress(UUID, TEXT, INTEGER) CASCADE;
-DROP FUNCTION IF EXISTS public.verify_mission(UUID, UUID) CASCADE;
-DROP FUNCTION IF EXISTS public.recalculate_all_missions() CASCADE;
-DROP FUNCTION IF EXISTS public.recalculate_all_rankings() CASCADE;
-DROP FUNCTION IF EXISTS public.auto_reward_mission_completion() CASCADE;
-DROP FUNCTION IF EXISTS public.has_role(UUID, app_role) CASCADE;
-DROP FUNCTION IF EXISTS public.handle_oauth_signup() CASCADE;
-DROP FUNCTION IF EXISTS public.get_user_auth_provider(UUID) CASCADE;
-DROP FUNCTION IF EXISTS public.user_has_password(UUID) CASCADE;
-DROP FUNCTION IF EXISTS public.get_user_password_status(UUID) CASCADE;
-DROP FUNCTION IF EXISTS public.create_password_reset_log(UUID, TEXT, TEXT, TEXT, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS public.verify_and_use_reset_token(TEXT) CASCADE;
-DROP FUNCTION IF EXISTS public.log_password_change(UUID, TEXT, TEXT, TEXT, TEXT, BOOLEAN, TEXT) CASCADE;
-DROP FUNCTION IF EXISTS public.cleanup_expired_reset_tokens() CASCADE;
 
--- Drop tables (order matters due to foreign keys)
-DROP TABLE IF EXISTS public.password_change_audit CASCADE;
-DROP TABLE IF EXISTS public.password_reset_logs CASCADE;
-DROP TABLE IF EXISTS public.mission_progress CASCADE;
-DROP TABLE IF EXISTS public.missions CASCADE;
-DROP TABLE IF EXISTS public.voucher_redemptions CASCADE;
-DROP TABLE IF EXISTS public.vouchers CASCADE;
-DROP TABLE IF EXISTS public.activities CASCADE;
-DROP TABLE IF EXISTS public.ranking_tiers CASCADE;
-DROP TABLE IF EXISTS public.locations CASCADE;
-DROP TABLE IF EXISTS public.user_roles CASCADE;
-DROP TABLE IF EXISTS public.profiles CASCADE;
+CREATE EXTENSION IF NOT EXISTS "pg_graphql" WITH SCHEMA "graphql";
 
--- Drop types
-DROP TYPE IF EXISTS public.voucher_type CASCADE;
-DROP TYPE IF EXISTS public.app_role CASCADE;
-DROP TYPE IF EXISTS public.verify_method CASCADE;
 
--- ============================================
--- STEP 2: CREATE ENUMS
--- ============================================
 
-CREATE TYPE public.app_role AS ENUM ('user', 'admin');
-CREATE TYPE public.voucher_type AS ENUM ('discount', 'food', 'credit');
-CREATE TYPE public.verify_method AS ENUM ('auto', 'manual');
 
--- ============================================
--- STEP 3: CREATE CORE TABLES
--- ============================================
 
--- Profiles table
-CREATE TABLE public.profiles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
-  username TEXT NOT NULL UNIQUE,
-  full_name TEXT NOT NULL,
-  email TEXT,
-  avatar_url TEXT,
-  points INTEGER DEFAULT 0 NOT NULL,
-  rank INTEGER DEFAULT 0 NOT NULL,
-  total_bottles INTEGER DEFAULT 0 NOT NULL,
-  total_weight_kg DECIMAL(10,2) DEFAULT 0 NOT NULL,
-  city TEXT,
-  auth_provider TEXT DEFAULT 'email' NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+
+CREATE EXTENSION IF NOT EXISTS "pg_stat_statements" WITH SCHEMA "extensions";
+
+
+
+
+
+
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA "extensions";
+
+
+
+
+
+
+CREATE EXTENSION IF NOT EXISTS "supabase_vault" WITH SCHEMA "vault";
+
+
+
+
+
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
+
+
+
+
+
+
+CREATE TYPE "public"."app_role" AS ENUM (
+    'user',
+    'admin'
 );
 
-COMMENT ON COLUMN public.profiles.auth_provider IS 'Auth provider: email, google, github, etc';
 
--- User roles table
-CREATE TABLE public.user_roles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  role app_role NOT NULL DEFAULT 'user',
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  UNIQUE(user_id, role)
+ALTER TYPE "public"."app_role" OWNER TO "postgres";
+
+
+CREATE TYPE "public"."verify_method" AS ENUM (
+    'auto',
+    'manual'
 );
 
--- Locations table
-CREATE TABLE public.locations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  address TEXT NOT NULL,
-  latitude DECIMAL(10,8) NOT NULL,
-  longitude DECIMAL(11,8) NOT NULL,
-  is_active BOOLEAN DEFAULT true NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+
+ALTER TYPE "public"."verify_method" OWNER TO "postgres";
+
+
+CREATE TYPE "public"."voucher_type" AS ENUM (
+    'discount',
+    'food',
+    'credit'
 );
 
--- Activities table
-CREATE TABLE public.activities (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  location_id UUID REFERENCES public.locations(id) ON DELETE SET NULL,
-  bottles_count INTEGER NOT NULL,
-  weight_kg DECIMAL(10,2) NOT NULL,
-  points_earned INTEGER NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+
+ALTER TYPE "public"."voucher_type" OWNER TO "postgres";
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = "heap";
+
+
+CREATE TABLE IF NOT EXISTS "public"."activities" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "location_id" "uuid",
+    "bottles_count" integer NOT NULL,
+    "weight_kg" numeric(10,2) NOT NULL,
+    "points_earned" integer NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
--- Vouchers table
-CREATE TABLE public.vouchers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type voucher_type NOT NULL,
-  title TEXT NOT NULL,
-  description TEXT NOT NULL,
-  points_required INTEGER NOT NULL,
-  image_url TEXT,
-  is_active BOOLEAN DEFAULT true NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+
+ALTER TABLE "public"."activities" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."ai_analytics" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "insights" "jsonb" NOT NULL,
+    "last_analyzed" timestamp with time zone NOT NULL,
+    "date_filter_type" character varying(50) NOT NULL,
+    "date_filter_start" timestamp with time zone NOT NULL,
+    "date_filter_end" timestamp with time zone NOT NULL,
+    "stats" "jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"()
 );
 
--- Voucher redemptions table
-CREATE TABLE public.voucher_redemptions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  voucher_id UUID REFERENCES public.vouchers(id) ON DELETE CASCADE NOT NULL,
-  redeemed_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+
+ALTER TABLE "public"."ai_analytics" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."profiles" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "username" "text" NOT NULL,
+    "full_name" "text" NOT NULL,
+    "email" "text",
+    "avatar_url" "text",
+    "points" integer DEFAULT 0 NOT NULL,
+    "rank" integer DEFAULT 0 NOT NULL,
+    "total_bottles" integer DEFAULT 0 NOT NULL,
+    "total_weight_kg" numeric(10,2) DEFAULT 0 NOT NULL,
+    "city" "text",
+    "auth_provider" "text" DEFAULT 'email'::"text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "xp" integer DEFAULT 0 NOT NULL,
+    "xp_month" integer DEFAULT EXTRACT(month FROM "now"()),
+    "xp_year" integer DEFAULT EXTRACT(year FROM "now"())
 );
 
--- Ranking tiers table
-CREATE TABLE public.ranking_tiers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  threshold_points INTEGER NOT NULL,
-  bonus_points INTEGER NOT NULL DEFAULT 0,
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+
+ALTER TABLE "public"."profiles" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."profiles"."auth_provider" IS 'Auth provider: email, google, github, etc';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."ranking_tiers" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "name" "text" NOT NULL,
+    "threshold_points" integer NOT NULL,
+    "bonus_points" integer DEFAULT 0 NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "is_active" boolean DEFAULT true,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
--- ============================================
--- STEP 4: CREATE MISSIONS TABLES
--- ============================================
 
--- Missions table with duration
-CREATE TABLE public.missions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  target_type VARCHAR(50) NOT NULL, -- 'bottles', 'weight_kg', 'points', 'activities'
-  target_value INTEGER NOT NULL,
-  points_bonus INTEGER NOT NULL DEFAULT 0,
-  mission_type VARCHAR(50) DEFAULT 'daily', -- 'daily', 'weekly', 'monthly', 'special'
-  difficulty VARCHAR(20) DEFAULT 'medium', -- 'easy', 'medium', 'hard'
-  duration_hours INTEGER DEFAULT 24, -- durasi misi dalam jam
-  icon VARCHAR(50),
-  start_date TIMESTAMP WITH TIME ZONE,
-  end_date TIMESTAMP WITH TIME ZONE,
-  is_active BOOLEAN DEFAULT true,
-  max_completions INTEGER DEFAULT 1,
-  city TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+ALTER TABLE "public"."ranking_tiers" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."leaderboard_view" AS
+ SELECT "p"."user_id",
+    "p"."username",
+    "p"."full_name",
+    "p"."avatar_url",
+    "p"."xp" AS "points",
+    "p"."total_bottles",
+    "p"."total_weight_kg",
+    "p"."city",
+    "rt"."name" AS "rank_name",
+    "row_number"() OVER (ORDER BY "p"."xp" DESC, "p"."username") AS "position"
+   FROM ("public"."profiles" "p"
+     LEFT JOIN "public"."ranking_tiers" "rt" ON (("rt"."sort_order" = "p"."rank")))
+  WHERE ("p"."xp" > 0)
+  ORDER BY "p"."xp" DESC, "p"."username";
+
+
+ALTER VIEW "public"."leaderboard_view" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."location_qr_codes" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "location_id" "uuid" NOT NULL,
+    "qr_code_url" "text" NOT NULL,
+    "qr_data" "jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"()
 );
 
--- Mission progress table with expiry
-CREATE TABLE public.mission_progress (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  mission_id UUID NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
-  progress_value INTEGER DEFAULT 0,
-  status VARCHAR(20) DEFAULT 'in_progress', -- 'in_progress', 'completed', 'claimed', 'expired'
-  started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  expires_at TIMESTAMP WITH TIME ZONE,
-  completed_at TIMESTAMP WITH TIME ZONE,
-  verified BOOLEAN DEFAULT false,
-  claimed_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(user_id, mission_id)
+
+ALTER TABLE "public"."location_qr_codes" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."locations" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "name" "text" NOT NULL,
+    "address" "text" NOT NULL,
+    "latitude" numeric(10,8) NOT NULL,
+    "longitude" numeric(11,8) NOT NULL,
+    "is_active" boolean DEFAULT true NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
--- ============================================
--- STEP 5: CREATE PASSWORD MANAGEMENT TABLES
--- ============================================
 
--- Password reset logs table
-CREATE TABLE public.password_reset_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  email TEXT NOT NULL,
-  token_hash TEXT NOT NULL UNIQUE,
-  expires_at TIMESTAMPTZ NOT NULL,
-  used_at TIMESTAMPTZ,
-  ip_address TEXT,
-  user_agent TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  CONSTRAINT password_reset_logs_valid_expiry CHECK (expires_at > created_at)
+ALTER TABLE "public"."locations" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."locations_with_qr" AS
+ SELECT "l"."id",
+    "l"."name",
+    "l"."address",
+    "l"."latitude",
+    "l"."longitude",
+    "l"."is_active",
+    "l"."created_at",
+    "l"."updated_at",
+    "lqc"."qr_code_url"
+   FROM ("public"."locations" "l"
+     LEFT JOIN "public"."location_qr_codes" "lqc" ON (("l"."id" = "lqc"."location_id")));
+
+
+ALTER VIEW "public"."locations_with_qr" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."mission_progress" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "mission_id" "uuid" NOT NULL,
+    "progress_value" integer DEFAULT 0,
+    "status" character varying(20) DEFAULT 'in_progress'::character varying,
+    "started_at" timestamp with time zone DEFAULT "now"(),
+    "expires_at" timestamp with time zone,
+    "completed_at" timestamp with time zone,
+    "verified" boolean DEFAULT false,
+    "claimed_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"()
 );
 
-COMMENT ON TABLE public.password_reset_logs IS 'Tracks password reset requests';
-COMMENT ON COLUMN public.password_reset_logs.token_hash IS 'SHA256 hash of the reset token';
 
--- Password change audit table
-CREATE TABLE public.password_change_audit (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  email TEXT NOT NULL,
-  change_type TEXT NOT NULL, -- 'password_changed', 'password_reset', 'password_reset_requested'
-  auth_method TEXT,
-  ip_address TEXT,
-  user_agent TEXT,
-  success BOOLEAN DEFAULT true NOT NULL,
-  error_message TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+ALTER TABLE "public"."mission_progress" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."missions" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "title" character varying(255) NOT NULL,
+    "description" "text",
+    "target_type" character varying(50) NOT NULL,
+    "target_value" integer NOT NULL,
+    "points_bonus" integer DEFAULT 0 NOT NULL,
+    "mission_type" character varying(50) DEFAULT 'daily'::character varying,
+    "difficulty" character varying(20) DEFAULT 'medium'::character varying,
+    "duration_hours" integer DEFAULT 24,
+    "icon" character varying(50),
+    "start_date" timestamp with time zone,
+    "end_date" timestamp with time zone,
+    "is_active" boolean DEFAULT true,
+    "max_completions" integer DEFAULT 1,
+    "city" "text",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"()
 );
 
--- ============================================
--- STEP 6: CREATE INDEXES
--- ============================================
 
-CREATE INDEX idx_profiles_user_id ON public.profiles(user_id);
-CREATE INDEX idx_profiles_username ON public.profiles(username);
-CREATE INDEX idx_user_roles_user_id ON public.user_roles(user_id);
-CREATE INDEX idx_activities_user_id ON public.activities(user_id);
-CREATE INDEX idx_activities_created_at ON public.activities(created_at DESC);
-CREATE INDEX idx_missions_active ON public.missions(is_active, mission_type);
-CREATE INDEX idx_missions_dates ON public.missions(start_date, end_date);
-CREATE INDEX idx_mission_progress_user ON public.mission_progress(user_id);
-CREATE INDEX idx_mission_progress_mission ON public.mission_progress(mission_id);
-CREATE INDEX idx_mission_progress_status ON public.mission_progress(status);
-CREATE INDEX idx_mission_progress_user_status ON public.mission_progress(user_id, status);
-CREATE INDEX idx_password_reset_logs_user_id ON public.password_reset_logs(user_id);
-CREATE INDEX idx_password_reset_logs_token_hash ON public.password_reset_logs(token_hash);
-CREATE INDEX idx_password_reset_logs_expires_at ON public.password_reset_logs(expires_at);
-CREATE INDEX idx_password_change_audit_user_id ON public.password_change_audit(user_id);
-CREATE INDEX idx_password_change_audit_created_at ON public.password_change_audit(created_at DESC);
+ALTER TABLE "public"."missions" OWNER TO "postgres";
 
--- ============================================
--- STEP 7: ENABLE ROW LEVEL SECURITY
--- ============================================
 
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.activities ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vouchers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.voucher_redemptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.missions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.mission_progress ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.ranking_tiers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.password_reset_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.password_change_audit ENABLE ROW LEVEL SECURITY;
+CREATE TABLE IF NOT EXISTS "public"."monthly_leaderboard_winners" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "month" integer NOT NULL,
+    "year" integer NOT NULL,
+    "position" integer NOT NULL,
+    "xp" integer NOT NULL,
+    "reward_points" integer NOT NULL,
+    "rewarded_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
 
--- ============================================
--- STEP 8: CREATE HELPER FUNCTIONS
--- ============================================
 
--- Function to check user role
-CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role app_role)
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $func$
-  SELECT EXISTS (
-    SELECT 1 FROM public.user_roles
-    WHERE user_id = _user_id AND role = _role
-  )
-$func$;
+ALTER TABLE "public"."monthly_leaderboard_winners" OWNER TO "postgres";
 
--- Function to update timestamp
-CREATE OR REPLACE FUNCTION public.update_updated_at_column()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $func$
+
+COMMENT ON TABLE "public"."monthly_leaderboard_winners" IS 'Top 3 winners each month with rewards';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."password_change_audit" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "email" "text" NOT NULL,
+    "change_type" "text" NOT NULL,
+    "auth_method" "text",
+    "ip_address" "text",
+    "user_agent" "text",
+    "success" boolean DEFAULT true NOT NULL,
+    "error_message" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."password_change_audit" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."password_reset_logs" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "email" "text" NOT NULL,
+    "token_hash" "text" NOT NULL,
+    "expires_at" timestamp with time zone NOT NULL,
+    "used_at" timestamp with time zone,
+    "ip_address" "text",
+    "user_agent" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "password_reset_logs_valid_expiry" CHECK (("expires_at" > "created_at"))
+);
+
+
+ALTER TABLE "public"."password_reset_logs" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."password_reset_logs" IS 'Tracks password reset requests';
+
+
+
+COMMENT ON COLUMN "public"."password_reset_logs"."token_hash" IS 'SHA256 hash of the reset token';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."points_transactions" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "type" "text" NOT NULL,
+    "amount" integer NOT NULL,
+    "balance_after" integer NOT NULL,
+    "source" "text" NOT NULL,
+    "reference_id" "uuid",
+    "description" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."points_transactions" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."points_transactions" IS 'Audit trail for all points transactions';
+
+
+
+CREATE OR REPLACE VIEW "public"."profile_points_view" AS
+ SELECT "p"."user_id",
+    "p"."username",
+    COALESCE("sum"("a"."points_earned"), (0)::bigint) AS "total_points"
+   FROM ("public"."profiles" "p"
+     LEFT JOIN "public"."activities" "a" ON (("p"."user_id" = "a"."user_id")))
+  GROUP BY "p"."user_id", "p"."username";
+
+
+ALTER VIEW "public"."profile_points_view" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."user_roles" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "role" "public"."app_role" DEFAULT 'user'::"public"."app_role" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."user_roles" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."voucher_redemptions" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "voucher_id" "uuid" NOT NULL,
+    "redeemed_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."voucher_redemptions" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."vouchers" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "type" "public"."voucher_type" NOT NULL,
+    "title" "text" NOT NULL,
+    "description" "text" NOT NULL,
+    "points_required" integer NOT NULL,
+    "image_url" "text",
+    "is_active" boolean DEFAULT true NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."vouchers" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."xp_history" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "month" integer NOT NULL,
+    "year" integer NOT NULL,
+    "total_xp" integer NOT NULL,
+    "final_rank" integer,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."xp_history" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."xp_history" IS 'Historical XP data per user per month';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."xp_transactions" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "type" "text" NOT NULL,
+    "amount" integer NOT NULL,
+    "balance_after" integer NOT NULL,
+    "month" integer NOT NULL,
+    "year" integer NOT NULL,
+    "source" "text" NOT NULL,
+    "reference_id" "uuid",
+    "description" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."xp_transactions" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."xp_transactions" IS 'Audit trail for all XP transactions';
+
+
+
+
+CREATE OR REPLACE FUNCTION "public"."add_activity_and_update_profile"("p_user_id" "uuid", "p_location_id" "uuid", "p_bottles_count" integer, "p_weight_kg" numeric, "p_points_earned" integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+  v_activity_id UUID;
+  v_result JSONB;
 BEGIN
-  NEW.updated_at = NOW();
+  -- Insert activity
+  INSERT INTO activities (user_id, location_id, bottles_count, weight_kg, points_earned)
+  VALUES (p_user_id, p_location_id, p_bottles_count, p_weight_kg, p_points_earned)
+  RETURNING id INTO v_activity_id;
+  
+  -- Update profile
+  PERFORM update_profile_from_activities(p_user_id);
+  
+  -- Return success
+  v_result := jsonb_build_object(
+    'success', true,
+    'activity_id', v_activity_id,
+    'message', 'Activity added and profile updated'
+  );
+  
+  RETURN v_result;
+  
+EXCEPTION WHEN OTHERS THEN
+  RETURN jsonb_build_object(
+    'success', false,
+    'error', SQLERRM,
+    'message', 'Failed to add activity'
+  );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."add_activity_and_update_profile"("p_user_id" "uuid", "p_location_id" "uuid", "p_bottles_count" integer, "p_weight_kg" numeric, "p_points_earned" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."add_user_points_and_xp"("p_user_id" "uuid", "p_amount" integer, "p_source" "text", "p_reference_id" "uuid" DEFAULT NULL::"uuid", "p_description" "text" DEFAULT NULL::"text") RETURNS TABLE("new_points" integer, "new_xp" integer)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_current_points INTEGER;
+  v_current_xp INTEGER;
+  v_current_month INTEGER;
+  v_current_year INTEGER;
+  v_new_points INTEGER;
+  v_new_xp INTEGER;
+BEGIN
+  -- Get current values
+  SELECT points, xp, xp_month, xp_year 
+  INTO v_current_points, v_current_xp, v_current_month, v_current_year
+  FROM public.profiles 
+  WHERE user_id = p_user_id;
+
+  -- Check if month/year changed (reset XP if needed)
+  IF v_current_month != EXTRACT(MONTH FROM NOW()) OR 
+     v_current_year != EXTRACT(YEAR FROM NOW()) THEN
+    -- Save old XP to history
+    INSERT INTO public.xp_history (user_id, month, year, total_xp)
+    VALUES (p_user_id, v_current_month, v_current_year, v_current_xp)
+    ON CONFLICT (user_id, month, year) 
+    DO UPDATE SET total_xp = EXCLUDED.total_xp;
+    
+    -- Reset XP
+    v_current_xp := 0;
+    
+    UPDATE public.profiles 
+    SET xp = 0,
+        xp_month = EXTRACT(MONTH FROM NOW()),
+        xp_year = EXTRACT(YEAR FROM NOW())
+    WHERE user_id = p_user_id;
+  END IF;
+
+  -- Calculate new values
+  v_new_points := v_current_points + p_amount;
+  v_new_xp := v_current_xp + p_amount;
+
+  -- Update profiles
+  UPDATE public.profiles 
+  SET 
+    points = v_new_points,
+    xp = v_new_xp,
+    updated_at = NOW()
+  WHERE user_id = p_user_id;
+
+  -- Record points transaction
+  INSERT INTO public.points_transactions (
+    user_id, type, amount, balance_after, source, reference_id, description
+  ) VALUES (
+    p_user_id, 'earn', p_amount, v_new_points, p_source, p_reference_id, p_description
+  );
+
+  -- Record XP transaction
+  INSERT INTO public.xp_transactions (
+    user_id, type, amount, balance_after, month, year, source, reference_id, description
+  ) VALUES (
+    p_user_id, 
+    'earn', 
+    p_amount, 
+    v_new_xp, 
+    EXTRACT(MONTH FROM NOW())::INTEGER,
+    EXTRACT(YEAR FROM NOW())::INTEGER,
+    p_source, 
+    p_reference_id, 
+    p_description
+  );
+
+  RETURN QUERY SELECT v_new_points, v_new_xp;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."add_user_points_and_xp"("p_user_id" "uuid", "p_amount" integer, "p_source" "text", "p_reference_id" "uuid", "p_description" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."apply_ranking_bonus"("_user_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+  current_points INTEGER;
+  current_rank INTEGER;
+  new_rank INTEGER := 0;
+  tier_record RECORD;
+  total_bonus INTEGER := 0;
+BEGIN
+  SELECT points, rank INTO current_points, current_rank 
+  FROM public.profiles WHERE user_id = _user_id;
+  
+  IF current_points IS NULL THEN RETURN; END IF;
+  
+  SELECT COALESCE(MAX(sort_order), 0) INTO new_rank
+  FROM public.ranking_tiers
+  WHERE threshold_points <= current_points AND is_active = true;
+  
+  IF new_rank > COALESCE(current_rank, 0) THEN
+    FOR tier_record IN 
+      SELECT bonus_points FROM public.ranking_tiers
+      WHERE sort_order > COALESCE(current_rank, 0)
+        AND sort_order <= new_rank
+        AND is_active = true
+      ORDER BY sort_order
+    LOOP
+      total_bonus := total_bonus + tier_record.bonus_points;
+    END LOOP;
+    
+    UPDATE public.profiles
+    SET rank = new_rank, points = points + total_bonus, updated_at = NOW()
+    WHERE user_id = _user_id;
+  END IF;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."apply_ranking_bonus"("_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."claim_mission_reward"("mission_progress_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_user_id UUID;
+  v_mission_id UUID;
+  v_points_bonus INTEGER;
+  v_status VARCHAR(20);
+BEGIN
+  SELECT user_id, mission_id, status
+  INTO v_user_id, v_mission_id, v_status
+  FROM mission_progress
+  WHERE id = mission_progress_id;
+
+  IF v_status != 'completed' THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Mission belum selesai');
+  END IF;
+
+  SELECT points_bonus INTO v_points_bonus FROM missions WHERE id = v_mission_id;
+
+  UPDATE profiles SET points = points + v_points_bonus WHERE user_id = v_user_id;
+
+  UPDATE mission_progress
+  SET status = 'claimed', claimed_at = NOW(), verified = true
+  WHERE id = mission_progress_id;
+
+  RETURN jsonb_build_object('success', true, 'points_earned', v_points_bonus);
+END;
+$$;
+
+
+ALTER FUNCTION "public"."claim_mission_reward"("mission_progress_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."deduct_user_points"("p_user_id" "uuid", "p_amount" integer, "p_source" "text", "p_reference_id" "uuid" DEFAULT NULL::"uuid", "p_description" "text" DEFAULT NULL::"text") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_current_points INTEGER;
+  v_new_points INTEGER;
+BEGIN
+  -- Get current points
+  SELECT points INTO v_current_points
+  FROM public.profiles 
+  WHERE user_id = p_user_id;
+
+  -- Check if sufficient points
+  IF v_current_points < p_amount THEN
+    RAISE EXCEPTION 'Insufficient points. Current: %, Required: %', v_current_points, p_amount;
+  END IF;
+
+  -- Calculate new points
+  v_new_points := v_current_points - p_amount;
+
+  -- Update profiles
+  UPDATE public.profiles 
+  SET points = v_new_points, updated_at = NOW()
+  WHERE user_id = p_user_id;
+
+  -- Record transaction
+  INSERT INTO public.points_transactions (
+    user_id, type, amount, balance_after, source, reference_id, description
+  ) VALUES (
+    p_user_id, 'redeem', -p_amount, v_new_points, p_source, p_reference_id, p_description
+  );
+
+  RETURN v_new_points;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."deduct_user_points"("p_user_id" "uuid", "p_amount" integer, "p_source" "text", "p_reference_id" "uuid", "p_description" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."expire_old_missions"() RETURNS "void"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  UPDATE mission_progress
+  SET status = 'expired', updated_at = NOW()
+  WHERE status = 'in_progress'
+    AND expires_at IS NOT NULL
+    AND expires_at < NOW();
+END;
+$$;
+
+
+ALTER FUNCTION "public"."expire_old_missions"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_user_auth_provider"("_user_id" "uuid") RETURNS "text"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    AS $$
+  SELECT COALESCE(auth_provider, 'email') 
+  FROM public.profiles WHERE user_id = _user_id LIMIT 1
+$$;
+
+
+ALTER FUNCTION "public"."get_user_auth_provider"("_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."handle_activity_points"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_points INTEGER;
+  v_result RECORD;
+BEGIN
+  -- Calculate points (contoh: 10 poin per botol)
+  v_points := NEW.bottles_count * 10;
+  
+  -- Add points and XP using the new function
+  SELECT * INTO v_result
+  FROM public.add_user_points_and_xp(
+    NEW.user_id,
+    v_points,
+    'activity',
+    NEW.id,
+    format('Setor %s botol', NEW.bottles_count)
+  );
+  
+  -- Update activity record
+  NEW.points_earned := v_points;
+  
+  -- Update user stats
+  UPDATE public.profiles
+  SET 
+    total_bottles = total_bottles + NEW.bottles_count,
+    total_weight_kg = total_weight_kg + COALESCE(NEW.weight_kg, 0),
+    updated_at = NOW()
+  WHERE user_id = NEW.user_id;
+  
   RETURN NEW;
 END;
-$func$;
+$$;
 
--- Function to handle new user signup
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $func$
+
+ALTER FUNCTION "public"."handle_activity_points"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
 BEGIN
   INSERT INTO public.profiles (user_id, username, full_name, email)
   VALUES (
@@ -339,17 +750,183 @@ BEGIN
   
   RETURN NEW;
 END;
-$func$;
+$$;
 
--- ============================================
--- STEP 9: CREATE MISSIONS FUNCTIONS
--- ============================================
 
--- Function to set expires_at on mission progress
-CREATE OR REPLACE FUNCTION public.set_mission_expiry()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $func$
+ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."handle_oauth_signup"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  _provider TEXT;
+BEGIN
+  _provider := COALESCE(NEW.raw_app_meta_data->>'provider', 'email');
+  
+  UPDATE public.profiles
+  SET auth_provider = _provider, updated_at = NOW()
+  WHERE user_id = NEW.id;
+  
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."handle_oauth_signup"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."has_role"("_user_id" "uuid", "_role" "public"."app_role") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = _user_id AND role = _role
+  )
+$$;
+
+
+ALTER FUNCTION "public"."has_role"("_user_id" "uuid", "_role" "public"."app_role") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."process_activity_no_profile_update"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  -- Hanya handle ranking bonus
+  PERFORM public.apply_ranking_bonus(NEW.user_id);
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."process_activity_no_profile_update"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."process_activity_safe"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  -- Only handle ranking, don't update profile
+  -- Profile updates will be handled by the application
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."process_activity_safe"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."process_monthly_leaderboard_reset"() RETURNS TABLE("winners_count" integer, "total_rewards" integer)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_last_month INTEGER;
+  v_last_year INTEGER;
+  v_winner RECORD;
+  v_reward_amount INTEGER;
+  v_winners_count INTEGER := 0;
+  v_total_rewards INTEGER := 0;
+BEGIN
+  -- Calculate last month/year
+  v_last_month := EXTRACT(MONTH FROM (NOW() - INTERVAL '1 month'))::INTEGER;
+  v_last_year := EXTRACT(YEAR FROM (NOW() - INTERVAL '1 month'))::INTEGER;
+
+  -- Get top 3 winners from last month
+  FOR v_winner IN
+    SELECT 
+      user_id,
+      xp,
+      ROW_NUMBER() OVER (ORDER BY xp DESC) as position
+    FROM public.profiles
+    WHERE xp_month = v_last_month AND xp_year = v_last_year
+    ORDER BY xp DESC
+    LIMIT 3
+  LOOP
+    -- Determine reward amount
+    CASE v_winner.position
+      WHEN 1 THEN v_reward_amount := 1000;
+      WHEN 2 THEN v_reward_amount := 500;
+      WHEN 3 THEN v_reward_amount := 250;
+      ELSE v_reward_amount := 0;
+    END CASE;
+
+    -- Add reward points
+    UPDATE public.profiles 
+    SET points = points + v_reward_amount
+    WHERE user_id = v_winner.user_id;
+
+    -- Record winner
+    INSERT INTO public.monthly_leaderboard_winners (
+      user_id, month, year, position, xp, reward_points
+    ) VALUES (
+      v_winner.user_id, v_last_month, v_last_year, 
+      v_winner.position, v_winner.xp, v_reward_amount
+    );
+
+    -- Record points transaction
+    INSERT INTO public.points_transactions (
+      user_id, type, amount, balance_after, source, description
+    ) VALUES (
+      v_winner.user_id, 
+      'reward', 
+      v_reward_amount, 
+      (SELECT points FROM public.profiles WHERE user_id = v_winner.user_id),
+      'monthly_reward',
+      format('Juara %s Leaderboard %s/%s', v_winner.position, v_last_month, v_last_year)
+    );
+
+    v_winners_count := v_winners_count + 1;
+    v_total_rewards := v_total_rewards + v_reward_amount;
+  END LOOP;
+
+  -- Save XP history for all users
+  INSERT INTO public.xp_history (user_id, month, year, total_xp)
+  SELECT 
+    user_id, 
+    xp_month, 
+    xp_year, 
+    xp
+  FROM public.profiles
+  WHERE xp > 0 AND xp_month = v_last_month AND xp_year = v_last_year
+  ON CONFLICT (user_id, month, year) 
+  DO UPDATE SET total_xp = EXCLUDED.total_xp;
+
+  -- Reset XP for all users
+  UPDATE public.profiles 
+  SET 
+    xp = 0,
+    xp_month = EXTRACT(MONTH FROM NOW())::INTEGER,
+    xp_year = EXTRACT(YEAR FROM NOW())::INTEGER,
+    updated_at = NOW();
+
+  -- Record reset transactions
+  INSERT INTO public.xp_transactions (
+    user_id, type, amount, balance_after, month, year, source, description
+  )
+  SELECT 
+    user_id,
+    'reset',
+    0,
+    0,
+    EXTRACT(MONTH FROM NOW())::INTEGER,
+    EXTRACT(YEAR FROM NOW())::INTEGER,
+    'monthly_reset',
+    format('Reset XP bulan %s/%s', v_last_month, v_last_year)
+  FROM public.profiles;
+
+  RETURN QUERY SELECT v_winners_count, v_total_rewards;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."process_monthly_leaderboard_reset"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."set_mission_expiry"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
 DECLARE
   v_duration_hours INTEGER;
 BEGIN
@@ -362,27 +939,52 @@ BEGIN
 
   RETURN NEW;
 END;
-$func$;
+$$;
 
--- Function to expire old missions
-CREATE OR REPLACE FUNCTION public.expire_old_missions()
-RETURNS void
-LANGUAGE plpgsql
-AS $func$
+
+ALTER FUNCTION "public"."set_mission_expiry"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sync_profile_points"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
 BEGIN
-  UPDATE mission_progress
-  SET status = 'expired', updated_at = NOW()
-  WHERE status = 'in_progress'
-    AND expires_at IS NOT NULL
-    AND expires_at < NOW();
-END;
-$func$;
+    UPDATE public.profiles
+    SET points = (
+        SELECT COALESCE(SUM(points_earned),0)
+        FROM public.activities
+        WHERE user_id = NEW.user_id
+    ) + (
+        SELECT COALESCE(SUM(amount),0)
+        FROM public.points_transactions
+        WHERE user_id = NEW.user_id
+    )
+    WHERE user_id = NEW.user_id;
 
--- Function to auto-update mission progress
-CREATE OR REPLACE FUNCTION public.update_mission_progress_on_activity()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $func$
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."sync_profile_points"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_location_qr_codes_updated_at"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_location_qr_codes_updated_at"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_mission_progress_on_activity"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
 BEGIN
   -- Expire old missions first
   UPDATE mission_progress
@@ -447,388 +1049,840 @@ BEGIN
 
   RETURN NEW;
 END;
-$func$;
+$$;
 
--- Function to claim mission reward (optional - can also be done client-side)
-CREATE OR REPLACE FUNCTION public.claim_mission_reward(mission_progress_id UUID)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $func$
+
+ALTER FUNCTION "public"."update_mission_progress_on_activity"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_profile_from_activities"("p_user_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    AS $$
 DECLARE
-  v_user_id UUID;
-  v_mission_id UUID;
-  v_points_bonus INTEGER;
-  v_status VARCHAR(20);
+  activity_totals RECORD;
 BEGIN
-  SELECT user_id, mission_id, status
-  INTO v_user_id, v_mission_id, v_status
-  FROM mission_progress
-  WHERE id = mission_progress_id;
-
-  IF v_status != 'completed' THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Mission belum selesai');
-  END IF;
-
-  SELECT points_bonus INTO v_points_bonus FROM missions WHERE id = v_mission_id;
-
-  UPDATE profiles SET points = points + v_points_bonus WHERE user_id = v_user_id;
-
-  UPDATE mission_progress
-  SET status = 'claimed', claimed_at = NOW(), verified = true
-  WHERE id = mission_progress_id;
-
-  RETURN jsonb_build_object('success', true, 'points_earned', v_points_bonus);
+  -- Get totals from all activities
+  SELECT 
+    SUM(bottles_count) as total_bottles,
+    SUM(points_earned) as total_points,
+    SUM(weight_kg) as total_weight_kg,
+    COUNT(*) as total_activities
+  INTO activity_totals
+  FROM activities 
+  WHERE user_id = p_user_id;
+  
+  -- Update profile with calculated totals
+  UPDATE profiles 
+  SET 
+    total_bottles = COALESCE(activity_totals.total_bottles, 0),
+    points = COALESCE(activity_totals.total_points, 0),
+    total_weight_kg = COALESCE(activity_totals.total_weight_kg, 0),
+    updated_at = NOW()
+  WHERE user_id = p_user_id;
+  
+  RAISE LOG 'Profile updated for user %: bottles=%, points=%, weight=%', 
+    p_user_id, 
+    COALESCE(activity_totals.total_bottles, 0),
+    COALESCE(activity_totals.total_points, 0),
+    COALESCE(activity_totals.total_weight_kg, 0);
 END;
-$func$;
+$$;
 
--- ============================================
--- STEP 10: CREATE RANKING FUNCTIONS
--- ============================================
 
-CREATE OR REPLACE FUNCTION public.apply_ranking_bonus(_user_id UUID)
-RETURNS VOID
-LANGUAGE plpgsql
-AS $func$
-DECLARE
-  current_points INTEGER;
-  current_rank INTEGER;
-  new_rank INTEGER := 0;
-  tier_record RECORD;
-  total_bonus INTEGER := 0;
+ALTER FUNCTION "public"."update_profile_from_activities"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_profile_points"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
 BEGIN
-  SELECT points, rank INTO current_points, current_rank 
-  FROM public.profiles WHERE user_id = _user_id;
-  
-  IF current_points IS NULL THEN RETURN; END IF;
-  
-  SELECT COALESCE(MAX(sort_order), 0) INTO new_rank
-  FROM public.ranking_tiers
-  WHERE threshold_points <= current_points AND is_active = true;
-  
-  IF new_rank > COALESCE(current_rank, 0) THEN
-    FOR tier_record IN 
-      SELECT bonus_points FROM public.ranking_tiers
-      WHERE sort_order > COALESCE(current_rank, 0)
-        AND sort_order <= new_rank
-        AND is_active = true
-      ORDER BY sort_order
-    LOOP
-      total_bonus := total_bonus + tier_record.bonus_points;
-    END LOOP;
-    
     UPDATE public.profiles
-    SET rank = new_rank, points = points + total_bonus, updated_at = NOW()
-    WHERE user_id = _user_id;
-  END IF;
+    SET points = points + NEW.points_earned
+    WHERE user_id = NEW.user_id;
+    RETURN NEW;
 END;
-$func$;
-
--- Function to process activity (update profile & missions)
-CREATE OR REPLACE FUNCTION public.process_activity()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $func$
-BEGIN
-  UPDATE public.profiles
-  SET points = points + NEW.points_earned,
-      total_bottles = total_bottles + NEW.bottles_count,
-      total_weight_kg = total_weight_kg + NEW.weight_kg,
-      updated_at = NOW()
-  WHERE user_id = NEW.user_id;
-  
-  PERFORM public.apply_ranking_bonus(NEW.user_id);
-  
-  RETURN NEW;
-END;
-$func$;
-
--- ============================================
--- STEP 11: CREATE PASSWORD MANAGEMENT FUNCTIONS
--- ============================================
-
-CREATE OR REPLACE FUNCTION public.get_user_auth_provider(_user_id UUID)
-RETURNS TEXT
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-AS $func$
-  SELECT COALESCE(auth_provider, 'email') 
-  FROM public.profiles WHERE user_id = _user_id LIMIT 1
-$func$;
-
-CREATE OR REPLACE FUNCTION public.user_has_password(_user_id UUID)
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-AS $func$
-  SELECT CASE 
-    WHEN (SELECT encrypted_password IS NOT NULL FROM auth.users WHERE id = _user_id) 
-    THEN true ELSE false 
-  END
-$func$;
-
-CREATE OR REPLACE FUNCTION public.handle_oauth_signup()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $func$
-DECLARE
-  _provider TEXT;
-BEGIN
-  _provider := COALESCE(NEW.raw_app_meta_data->>'provider', 'email');
-  
-  UPDATE public.profiles
-  SET auth_provider = _provider, updated_at = NOW()
-  WHERE user_id = NEW.id;
-  
-  RETURN NEW;
-END;
-$func$;
-
--- ============================================
--- STEP 12: CREATE TRIGGERS
--- ============================================
-
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
-CREATE TRIGGER on_auth_user_created_set_provider
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_oauth_signup();
-
-CREATE TRIGGER update_profiles_updated_at
-  BEFORE UPDATE ON public.profiles
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
-CREATE TRIGGER update_locations_updated_at
-  BEFORE UPDATE ON public.locations
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
-CREATE TRIGGER update_vouchers_updated_at
-  BEFORE UPDATE ON public.vouchers
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
-CREATE TRIGGER update_missions_updated_at
-  BEFORE UPDATE ON public.missions
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
-CREATE TRIGGER update_mission_progress_updated_at
-  BEFORE UPDATE ON public.mission_progress
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
-CREATE TRIGGER update_ranking_tiers_updated_at
-  BEFORE UPDATE ON public.ranking_tiers
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
-CREATE TRIGGER set_mission_expiry_trigger
-  BEFORE INSERT ON public.mission_progress
-  FOR EACH ROW EXECUTE FUNCTION public.set_mission_expiry();
-
-CREATE TRIGGER auto_update_mission_progress
-  AFTER INSERT ON public.activities
-  FOR EACH ROW EXECUTE FUNCTION public.update_mission_progress_on_activity();
-
-CREATE TRIGGER process_activity_trigger
-  AFTER INSERT ON public.activities
-  FOR EACH ROW EXECUTE FUNCTION public.process_activity();
-
--- ============================================
--- STEP 13: CREATE RLS POLICIES
--- ============================================
-
--- Profiles policies
-CREATE POLICY "Users can view all profiles" ON public.profiles FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE TO authenticated USING (auth.uid() = user_id);
-
--- Locations policies
-CREATE POLICY "Anyone can view active locations" ON public.locations FOR SELECT TO authenticated USING (is_active = true OR public.has_role(auth.uid(), 'admin'));
-CREATE POLICY "Admins can manage locations" ON public.locations FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'admin'));
-
--- Activities policies
-CREATE POLICY "Users can view own activities" ON public.activities FOR SELECT TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own activities" ON public.activities FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-
--- Missions policies
-CREATE POLICY "Anyone can view active missions" ON public.missions FOR SELECT USING (is_active = true);
-
--- Mission progress policies
-CREATE POLICY "Users can view their own mission progress" ON public.mission_progress FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can create their own mission progress" ON public.mission_progress FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update their own mission progress" ON public.mission_progress FOR UPDATE USING (auth.uid() = user_id);
-
--- Vouchers policies
-CREATE POLICY "Users can view active vouchers" ON public.vouchers FOR SELECT TO authenticated USING (is_active = true);
-
--- Voucher redemptions policies
-CREATE POLICY "Users can view own redemptions" ON public.voucher_redemptions FOR SELECT TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY "Users can create own redemptions" ON public.voucher_redemptions FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-
--- Ranking tiers policies
-CREATE POLICY "Users can view ranking tiers" ON public.ranking_tiers FOR SELECT TO authenticated USING (true);
-
--- Password logs policies
-CREATE POLICY "Users can view own reset logs" ON public.password_reset_logs FOR SELECT TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY "Users can view own audit logs" ON public.password_change_audit FOR SELECT TO authenticated USING (auth.uid() = user_id);
-
--- ============================================
--- STEP 14: INSERT SAMPLE DATA
--- ============================================
-
--- Sample locations
-INSERT INTO public.locations (name, address, latitude, longitude) VALUES
-  ('EcoTrade Hub Central', 'Jl. Sudirman No. 123, Jakarta Pusat', -6.208763, 106.845599),
-  ('EcoTrade Station North', 'Jl. Gatot Subroto No. 45, Jakarta Utara', -6.174465, 106.829376),
-  ('EcoTrade Point South', 'Jl. TB Simatupang No. 78, Jakarta Selatan', -6.290632, 106.822395);
-
--- Sample vouchers
-INSERT INTO public.vouchers (type, title, description, points_required, is_active) VALUES
-  ('discount', 'Diskon 20% Belanja', 'Dapatkan diskon 20% untuk belanja di toko partner', 500, true),
-  ('food', 'Gratis Burger Combo', 'Nikmati burger combo gratis di restoran partner', 800, true),
-  ('credit', 'Pulsa 50K', 'Voucher pulsa senilai Rp 50.000', 1000, true);
-
--- Sample missions with duration
-INSERT INTO public.missions (title, description, target_type, target_value, points_bonus, mission_type, difficulty, duration_hours, icon) VALUES
-  ('Pemula Ramah Lingkungan', 'Setor 5 botol plastik pertamamu', 'bottles', 5, 50, 'daily', 'easy', 24, 'Recycle'),
-  ('Penyelamat Harian', 'Setor 10 botol dalam sehari', 'bottles', 10, 100, 'daily', 'medium', 24, 'Trophy'),
-  ('Master Daur Ulang', 'Setor 50 botol dalam seminggu', 'bottles', 50, 500, 'weekly', 'hard', 168, 'Award'),
-  ('Kolektor Berat', 'Kumpulkan 5kg sampah plastik', 'weight_kg', 5, 200, 'weekly', 'medium', 168, 'Weight'),
-  ('Pejuang Lingkungan', 'Lakukan 3 aktivitas daur ulang', 'activities', 3, 150, 'daily', 'easy', 24, 'Target'),
-  ('Juara Mingguan', 'Kumpulkan 500 poin dalam seminggu', 'points', 500, 250, 'weekly', 'medium', 168, 'TrendingUp');
-
--- Sample ranking tiers
-INSERT INTO public.ranking_tiers (name, threshold_points, bonus_points, sort_order, is_active) VALUES
-  ('Bronze', 0, 0, 1, true),
-  ('Silver', 500, 50, 2, true),
-  ('Gold', 1500, 100, 3, true),
-  ('Platinum', 3000, 200, 4, true),
-  ('Diamond', 5000, 300, 5, true);
-
--- ============================================
--- STEP 15: CREATE VIEWS
--- ============================================
-
-CREATE OR REPLACE VIEW public.leaderboard_view AS
-SELECT 
-  p.user_id,
-  p.username,
-  p.full_name,
-  p.avatar_url,
-  p.points,
-  p.total_bottles,
-  p.total_weight_kg,
-  p.city,
-  rt.name as rank_name,
-  ROW_NUMBER() OVER (ORDER BY p.points DESC) as position
-FROM public.profiles p
-LEFT JOIN public.ranking_tiers rt ON rt.sort_order = p.rank
-ORDER BY p.points DESC;
+$$;
 
 
--- Create table for AI Analytics storage
-CREATE TABLE IF NOT EXISTS ai_analytics (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    insights JSONB NOT NULL,
-    last_analyzed TIMESTAMP WITH TIME ZONE NOT NULL,
-    date_filter_type VARCHAR(50) NOT NULL,
-    date_filter_start TIMESTAMP WITH TIME ZONE NOT NULL,
-    date_filter_end TIMESTAMP WITH TIME ZONE NOT NULL,
-    stats JSONB NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+ALTER FUNCTION "public"."update_profile_points"() OWNER TO "postgres";
 
---Create index for better performance
-CREATE INDEX IF NOT EXISTS idx_ai_analytics_created_at ON ai_analytics(created_at DESC);
 
--- Enable RLS (Row Level Security)
-ALTER TABLE ai_analytics ENABLE ROW LEVEL SECURITY;
-
--- Create policy for authenticated users (adjust as needed)
-CREATE POLICY "Users can manage their own AI analytics" ON ai_analytics
-    FOR ALL USING (auth.uid() IS NOT NULL);
-
--- Optional: Create trigger for updated_at
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION "public"."update_updated_at_column"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$;
 
-CREATE TRIGGER update_ai_analytics_updated_at 
-    BEFORE UPDATE ON ai_analytics 
-    FOR EACH ROW 
-    EXECUTE FUNCTION update_updated_at_column();
 
--- Test insert to verify table works
-INSERT INTO ai_analytics (insights, last_analyzed, date_filter_type, date_filter_start, date_filter_end, stats)
-VALUES (
-    '[{"type": "test", "title": "Test", "description": "Test", "confidence": 0.5, "impact": "low"}]',
-    NOW(),
-    'test',
-    NOW(),
-    NOW(),
-    '{"totalBottles": 0, "totalUsers": 0, "totalActiveUsers": 0, "totalRedemptions": 0, "totalLocations": 0, "totalVouchers": 0}'
-)
-ON CONFLICT (id) DO NOTHING;
+ALTER FUNCTION "public"."update_updated_at_column"() OWNER TO "postgres";
 
--- ============================================
--- User Roles policies (ADD THIS)
--- ============================================
 
--- Allow service role to insert roles for new users
-CREATE POLICY "Service can insert user roles" 
-ON public.user_roles 
-FOR INSERT 
-TO authenticated 
-WITH CHECK (true);
+CREATE OR REPLACE FUNCTION "public"."user_has_password"("_user_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    AS $$
+  SELECT CASE 
+    WHEN (SELECT encrypted_password IS NOT NULL FROM auth.users WHERE id = _user_id) 
+    THEN true ELSE false 
+  END
+$$;
 
--- Users can view their own roles
-CREATE POLICY "Users can view own roles" 
-ON public.user_roles 
-FOR SELECT 
-TO authenticated 
-USING (auth.uid() = user_id);
 
--- Admins can manage all roles
-CREATE POLICY "Admins can manage all roles" 
-ON public.user_roles 
-FOR ALL 
-TO authenticated 
-USING (public.has_role(auth.uid(), 'admin'));
+ALTER FUNCTION "public"."user_has_password"("_user_id" "uuid") OWNER TO "postgres";
 
--- ============================================
--- SAMPLE MISSION DATA
--- ============================================
 
--- Insert sample missions
-INSERT INTO public.missions (title, description, target_type, target_value, points_bonus, mission_type, difficulty, duration_hours, icon, is_active, max_completions) VALUES
-('Eco Warrior', 'Kumpulkan 10 botol untuk membantu lingkungan', 'bottles', 10, 50, 'daily', 'easy', 24, '🎯', true, 1),
-('Point Master', 'Dapatkan 100 poin dari aktivitas recycling', 'points', 100, 25, 'daily', 'medium', 24, '⭐', true, 1),
-('Weight Champion', 'Kumpulkan total 1kg berat botol', 'weight_kg', 1, 75, 'daily', 'medium', 24, '⚖️', true, 1),
-('Weekly Streak', 'Lakukan recycling selama 7 hari berturut-turut', 'activities', 7, 100, 'weekly', 'hard', 168, '🔥', true, 1),
-('Friend Referral', 'Ajak 3 teman untuk bergabung dengan EcoTrade', 'activities', 3, 150, 'special', 'medium', 72, '👥', true, 3),
-('Monthly Hero', 'Kumpulkan 50 botol dalam sebulan', 'bottles', 50, 200, 'monthly', 'hard', 720, '🏆', true, 1),
-('Green Starter', 'Lakukan recycling pertama kali', 'activities', 1, 10, 'daily', 'easy', 24, '🌱', true, 1),
-('Heavy Lifter', 'Kumpulkan 5kg berat botol', 'weight_kg', 5, 125, 'weekly', 'medium', 168, '💪', true, 2)
-ON CONFLICT DO NOTHING;
+ALTER TABLE ONLY "public"."activities"
+    ADD CONSTRAINT "activities_pkey" PRIMARY KEY ("id");
 
--- ============================================
--- SAMPLE RANKING TIERS DATA
--- ============================================
 
--- Insert sample ranking tiers (already exists in migration, but ensuring complete data)
-INSERT INTO public.ranking_tiers (name, threshold_points, bonus_points, sort_order, is_active) VALUES
-('Diamond', 5000, 300, 1, true),
-('Platinum', 3000, 200, 2, true),
-('Gold', 1500, 100, 3, true),
-('Silver', 500, 50, 4, true),
-('Bronze', 0, 0, 5, true)
-ON CONFLICT DO NOTHING;
 
--- ============================================
--- MIGRATION
+ALTER TABLE ONLY "public"."ai_analytics"
+    ADD CONSTRAINT "ai_analytics_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."location_qr_codes"
+    ADD CONSTRAINT "location_qr_codes_location_id_key" UNIQUE ("location_id");
+
+
+
+ALTER TABLE ONLY "public"."location_qr_codes"
+    ADD CONSTRAINT "location_qr_codes_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."locations"
+    ADD CONSTRAINT "locations_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."mission_progress"
+    ADD CONSTRAINT "mission_progress_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."mission_progress"
+    ADD CONSTRAINT "mission_progress_user_id_mission_id_key" UNIQUE ("user_id", "mission_id");
+
+
+
+ALTER TABLE ONLY "public"."missions"
+    ADD CONSTRAINT "missions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."monthly_leaderboard_winners"
+    ADD CONSTRAINT "monthly_leaderboard_winners_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."monthly_leaderboard_winners"
+    ADD CONSTRAINT "monthly_leaderboard_winners_user_id_month_year_key" UNIQUE ("user_id", "month", "year");
+
+
+
+ALTER TABLE ONLY "public"."password_change_audit"
+    ADD CONSTRAINT "password_change_audit_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."password_reset_logs"
+    ADD CONSTRAINT "password_reset_logs_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."password_reset_logs"
+    ADD CONSTRAINT "password_reset_logs_token_hash_key" UNIQUE ("token_hash");
+
+
+
+ALTER TABLE ONLY "public"."points_transactions"
+    ADD CONSTRAINT "points_transactions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."profiles"
+    ADD CONSTRAINT "profiles_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."profiles"
+    ADD CONSTRAINT "profiles_user_id_key" UNIQUE ("user_id");
+
+
+
+ALTER TABLE ONLY "public"."profiles"
+    ADD CONSTRAINT "profiles_username_key" UNIQUE ("username");
+
+
+
+ALTER TABLE ONLY "public"."ranking_tiers"
+    ADD CONSTRAINT "ranking_tiers_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."user_roles"
+    ADD CONSTRAINT "user_roles_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."user_roles"
+    ADD CONSTRAINT "user_roles_user_id_role_key" UNIQUE ("user_id", "role");
+
+
+
+ALTER TABLE ONLY "public"."voucher_redemptions"
+    ADD CONSTRAINT "voucher_redemptions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."vouchers"
+    ADD CONSTRAINT "vouchers_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."xp_history"
+    ADD CONSTRAINT "xp_history_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."xp_history"
+    ADD CONSTRAINT "xp_history_user_id_month_year_key" UNIQUE ("user_id", "month", "year");
+
+
+
+ALTER TABLE ONLY "public"."xp_transactions"
+    ADD CONSTRAINT "xp_transactions_pkey" PRIMARY KEY ("id");
+
+
+
+CREATE INDEX "idx_activities_created_at" ON "public"."activities" USING "btree" ("created_at" DESC);
+
+
+
+CREATE INDEX "idx_activities_user_id" ON "public"."activities" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_ai_analytics_created_at" ON "public"."ai_analytics" USING "btree" ("created_at" DESC);
+
+
+
+CREATE INDEX "idx_location_qr_codes_location_id" ON "public"."location_qr_codes" USING "btree" ("location_id");
+
+
+
+CREATE INDEX "idx_mission_progress_mission" ON "public"."mission_progress" USING "btree" ("mission_id");
+
+
+
+CREATE INDEX "idx_mission_progress_status" ON "public"."mission_progress" USING "btree" ("status");
+
+
+
+CREATE INDEX "idx_mission_progress_user" ON "public"."mission_progress" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_mission_progress_user_status" ON "public"."mission_progress" USING "btree" ("user_id", "status");
+
+
+
+CREATE INDEX "idx_missions_active" ON "public"."missions" USING "btree" ("is_active", "mission_type");
+
+
+
+CREATE INDEX "idx_missions_dates" ON "public"."missions" USING "btree" ("start_date", "end_date");
+
+
+
+CREATE INDEX "idx_monthly_winners_date" ON "public"."monthly_leaderboard_winners" USING "btree" ("year" DESC, "month" DESC);
+
+
+
+CREATE INDEX "idx_password_change_audit_created_at" ON "public"."password_change_audit" USING "btree" ("created_at" DESC);
+
+
+
+CREATE INDEX "idx_password_change_audit_user_id" ON "public"."password_change_audit" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_password_reset_logs_expires_at" ON "public"."password_reset_logs" USING "btree" ("expires_at");
+
+
+
+CREATE INDEX "idx_password_reset_logs_token_hash" ON "public"."password_reset_logs" USING "btree" ("token_hash");
+
+
+
+CREATE INDEX "idx_password_reset_logs_user_id" ON "public"."password_reset_logs" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_points_transactions_user" ON "public"."points_transactions" USING "btree" ("user_id", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_profiles_user_id" ON "public"."profiles" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_profiles_username" ON "public"."profiles" USING "btree" ("username");
+
+
+
+CREATE INDEX "idx_profiles_xp" ON "public"."profiles" USING "btree" ("xp" DESC);
+
+
+
+CREATE INDEX "idx_user_roles_user_id" ON "public"."user_roles" USING "btree" ("user_id");
+
+
+
+CREATE INDEX "idx_xp_history_date" ON "public"."xp_history" USING "btree" ("year" DESC, "month" DESC);
+
+
+
+CREATE INDEX "idx_xp_history_user_date" ON "public"."xp_history" USING "btree" ("user_id", "year" DESC, "month" DESC);
+
+
+
+CREATE INDEX "idx_xp_transactions_user" ON "public"."xp_transactions" USING "btree" ("user_id", "created_at" DESC);
+
+
+
+CREATE OR REPLACE TRIGGER "on_activity_created" BEFORE INSERT ON "public"."activities" FOR EACH ROW EXECUTE FUNCTION "public"."handle_activity_points"();
+
+
+
+CREATE OR REPLACE TRIGGER "set_mission_expiry_trigger" BEFORE INSERT ON "public"."mission_progress" FOR EACH ROW EXECUTE FUNCTION "public"."set_mission_expiry"();
+
+
+
+-- CREATE OR REPLACE TRIGGER "trg_sync_points_transactions" AFTER INSERT OR UPDATE ON "public"."points_transactions" FOR EACH ROW EXECUTE FUNCTION "public"."sync_profile_points"();
+
+
+
+CREATE OR REPLACE TRIGGER "update_location_qr_codes_updated_at" BEFORE UPDATE ON "public"."location_qr_codes" FOR EACH ROW EXECUTE FUNCTION "public"."update_location_qr_codes_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "update_locations_updated_at" BEFORE UPDATE ON "public"."locations" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+
+
+CREATE OR REPLACE TRIGGER "update_mission_progress_updated_at" BEFORE UPDATE ON "public"."mission_progress" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+
+
+CREATE OR REPLACE TRIGGER "update_missions_updated_at" BEFORE UPDATE ON "public"."missions" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+
+
+CREATE OR REPLACE TRIGGER "update_profiles_updated_at" BEFORE UPDATE ON "public"."profiles" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+
+
+CREATE OR REPLACE TRIGGER "update_ranking_tiers_updated_at" BEFORE UPDATE ON "public"."ranking_tiers" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+
+
+CREATE OR REPLACE TRIGGER "update_vouchers_updated_at" BEFORE UPDATE ON "public"."vouchers" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
+
+
+ALTER TABLE ONLY "public"."activities"
+    ADD CONSTRAINT "activities_location_id_fkey" FOREIGN KEY ("location_id") REFERENCES "public"."locations"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."activities"
+    ADD CONSTRAINT "activities_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."location_qr_codes"
+    ADD CONSTRAINT "location_qr_codes_location_id_fkey" FOREIGN KEY ("location_id") REFERENCES "public"."locations"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."mission_progress"
+    ADD CONSTRAINT "mission_progress_mission_id_fkey" FOREIGN KEY ("mission_id") REFERENCES "public"."missions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."mission_progress"
+    ADD CONSTRAINT "mission_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."monthly_leaderboard_winners"
+    ADD CONSTRAINT "monthly_leaderboard_winners_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."password_change_audit"
+    ADD CONSTRAINT "password_change_audit_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."password_reset_logs"
+    ADD CONSTRAINT "password_reset_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."points_transactions"
+    ADD CONSTRAINT "points_transactions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."profiles"
+    ADD CONSTRAINT "profiles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."user_roles"
+    ADD CONSTRAINT "user_roles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."voucher_redemptions"
+    ADD CONSTRAINT "voucher_redemptions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."voucher_redemptions"
+    ADD CONSTRAINT "voucher_redemptions_voucher_id_fkey" FOREIGN KEY ("voucher_id") REFERENCES "public"."vouchers"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."xp_history"
+    ADD CONSTRAINT "xp_history_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."xp_transactions"
+    ADD CONSTRAINT "xp_transactions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+CREATE POLICY "Admins can manage all roles" ON "public"."user_roles" TO "authenticated" USING ("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role"));
+
+
+
+CREATE POLICY "Admins can manage locations" ON "public"."locations" TO "authenticated" USING ("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role"));
+
+
+
+CREATE POLICY "Admins can view all QR codes" ON "public"."location_qr_codes" FOR SELECT USING (("auth"."role"() = 'authenticated'::"text"));
+
+
+
+CREATE POLICY "Admins can view all locations" ON "public"."locations" FOR SELECT USING (("auth"."role"() = 'authenticated'::"text"));
+
+
+
+CREATE POLICY "Allow insert for authenticated users" ON "public"."profiles" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Anyone can view active missions" ON "public"."missions" FOR SELECT USING (("is_active" = true));
+
+
+
+CREATE POLICY "Service can insert user roles" ON "public"."user_roles" FOR INSERT TO "authenticated" WITH CHECK (true);
+
+
+
+CREATE POLICY "Users can create own redemptions" ON "public"."voucher_redemptions" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can create their own mission progress" ON "public"."mission_progress" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can insert own activities" ON "public"."activities" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can manage location QR codes" ON "public"."location_qr_codes" USING (("auth"."uid"() IS NOT NULL));
+
+
+
+CREATE POLICY "Users can manage their own AI analytics" ON "public"."ai_analytics" USING (("auth"."uid"() IS NOT NULL));
+
+
+
+CREATE POLICY "Users can update own profile" ON "public"."profiles" FOR UPDATE TO "authenticated" USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can update their own mission progress" ON "public"."mission_progress" FOR UPDATE USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can view active locations" ON "public"."locations" FOR SELECT USING ((("is_active" = true) AND ("auth"."role"() = 'authenticated'::"text")));
+
+
+
+CREATE POLICY "Users can view active vouchers" ON "public"."vouchers" FOR SELECT TO "authenticated" USING (("is_active" = true));
+
+
+
+CREATE POLICY "Users can view all profiles" ON "public"."profiles" FOR SELECT TO "authenticated" USING (true);
+
+
+
+CREATE POLICY "Users can view own activities" ON "public"."activities" FOR SELECT TO "authenticated" USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can view own audit logs" ON "public"."password_change_audit" FOR SELECT TO "authenticated" USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can view own redemptions" ON "public"."voucher_redemptions" FOR SELECT TO "authenticated" USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can view own reset logs" ON "public"."password_reset_logs" FOR SELECT TO "authenticated" USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can view own roles" ON "public"."user_roles" FOR SELECT TO "authenticated" USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can view ranking tiers" ON "public"."ranking_tiers" FOR SELECT TO "authenticated" USING (true);
+
+
+
+CREATE POLICY "Users can view their own mission progress" ON "public"."mission_progress" FOR SELECT USING (("auth"."uid"() = "user_id"));
+
+
+
+ALTER TABLE "public"."activities" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."ai_analytics" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."location_qr_codes" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."locations" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."mission_progress" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."missions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."password_change_audit" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."password_reset_logs" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."ranking_tiers" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."user_roles" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."voucher_redemptions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."vouchers" ENABLE ROW LEVEL SECURITY;
+
+
+
+
+ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
+
+
+GRANT USAGE ON SCHEMA "public" TO "postgres";
+GRANT USAGE ON SCHEMA "public" TO "anon";
+GRANT USAGE ON SCHEMA "public" TO "authenticated";
+GRANT USAGE ON SCHEMA "public" TO "service_role";
+
+
+
+
+GRANT ALL ON FUNCTION "public"."add_activity_and_update_profile"("p_user_id" "uuid", "p_location_id" "uuid", "p_bottles_count" integer, "p_weight_kg" numeric, "p_points_earned" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."add_activity_and_update_profile"("p_user_id" "uuid", "p_location_id" "uuid", "p_bottles_count" integer, "p_weight_kg" numeric, "p_points_earned" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."add_activity_and_update_profile"("p_user_id" "uuid", "p_location_id" "uuid", "p_bottles_count" integer, "p_weight_kg" numeric, "p_points_earned" integer) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."add_user_points_and_xp"("p_user_id" "uuid", "p_amount" integer, "p_source" "text", "p_reference_id" "uuid", "p_description" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."add_user_points_and_xp"("p_user_id" "uuid", "p_amount" integer, "p_source" "text", "p_reference_id" "uuid", "p_description" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."add_user_points_and_xp"("p_user_id" "uuid", "p_amount" integer, "p_source" "text", "p_reference_id" "uuid", "p_description" "text") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."apply_ranking_bonus"("_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."apply_ranking_bonus"("_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."apply_ranking_bonus"("_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."claim_mission_reward"("mission_progress_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."claim_mission_reward"("mission_progress_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."claim_mission_reward"("mission_progress_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."deduct_user_points"("p_user_id" "uuid", "p_amount" integer, "p_source" "text", "p_reference_id" "uuid", "p_description" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."deduct_user_points"("p_user_id" "uuid", "p_amount" integer, "p_source" "text", "p_reference_id" "uuid", "p_description" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."deduct_user_points"("p_user_id" "uuid", "p_amount" integer, "p_source" "text", "p_reference_id" "uuid", "p_description" "text") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."expire_old_missions"() TO "anon";
+GRANT ALL ON FUNCTION "public"."expire_old_missions"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."expire_old_missions"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_user_auth_provider"("_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_user_auth_provider"("_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_user_auth_provider"("_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."handle_activity_points"() TO "anon";
+GRANT ALL ON FUNCTION "public"."handle_activity_points"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."handle_activity_points"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "anon";
+GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."handle_oauth_signup"() TO "anon";
+GRANT ALL ON FUNCTION "public"."handle_oauth_signup"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."handle_oauth_signup"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."has_role"("_user_id" "uuid", "_role" "public"."app_role") TO "anon";
+GRANT ALL ON FUNCTION "public"."has_role"("_user_id" "uuid", "_role" "public"."app_role") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."has_role"("_user_id" "uuid", "_role" "public"."app_role") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."process_activity_no_profile_update"() TO "anon";
+GRANT ALL ON FUNCTION "public"."process_activity_no_profile_update"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."process_activity_no_profile_update"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."process_activity_safe"() TO "anon";
+GRANT ALL ON FUNCTION "public"."process_activity_safe"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."process_activity_safe"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."process_monthly_leaderboard_reset"() TO "anon";
+GRANT ALL ON FUNCTION "public"."process_monthly_leaderboard_reset"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."process_monthly_leaderboard_reset"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."set_mission_expiry"() TO "anon";
+GRANT ALL ON FUNCTION "public"."set_mission_expiry"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."set_mission_expiry"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."sync_profile_points"() TO "anon";
+GRANT ALL ON FUNCTION "public"."sync_profile_points"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."sync_profile_points"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_location_qr_codes_updated_at"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_location_qr_codes_updated_at"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_location_qr_codes_updated_at"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_mission_progress_on_activity"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_mission_progress_on_activity"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_mission_progress_on_activity"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_profile_from_activities"("p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."update_profile_from_activities"("p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_profile_from_activities"("p_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_profile_points"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_profile_points"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_profile_points"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."user_has_password"("_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."user_has_password"("_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."user_has_password"("_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."activities" TO "anon";
+GRANT ALL ON TABLE "public"."activities" TO "authenticated";
+GRANT ALL ON TABLE "public"."activities" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."ai_analytics" TO "anon";
+GRANT ALL ON TABLE "public"."ai_analytics" TO "authenticated";
+GRANT ALL ON TABLE "public"."ai_analytics" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."profiles" TO "anon";
+GRANT ALL ON TABLE "public"."profiles" TO "authenticated";
+GRANT ALL ON TABLE "public"."profiles" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."ranking_tiers" TO "anon";
+GRANT ALL ON TABLE "public"."ranking_tiers" TO "authenticated";
+GRANT ALL ON TABLE "public"."ranking_tiers" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."leaderboard_view" TO "anon";
+GRANT ALL ON TABLE "public"."leaderboard_view" TO "authenticated";
+GRANT ALL ON TABLE "public"."leaderboard_view" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."location_qr_codes" TO "anon";
+GRANT ALL ON TABLE "public"."location_qr_codes" TO "authenticated";
+GRANT ALL ON TABLE "public"."location_qr_codes" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."locations" TO "anon";
+GRANT ALL ON TABLE "public"."locations" TO "authenticated";
+GRANT ALL ON TABLE "public"."locations" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."locations_with_qr" TO "anon";
+GRANT ALL ON TABLE "public"."locations_with_qr" TO "authenticated";
+GRANT ALL ON TABLE "public"."locations_with_qr" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."mission_progress" TO "anon";
+GRANT ALL ON TABLE "public"."mission_progress" TO "authenticated";
+GRANT ALL ON TABLE "public"."mission_progress" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."missions" TO "anon";
+GRANT ALL ON TABLE "public"."missions" TO "authenticated";
+GRANT ALL ON TABLE "public"."missions" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."monthly_leaderboard_winners" TO "anon";
+GRANT ALL ON TABLE "public"."monthly_leaderboard_winners" TO "authenticated";
+GRANT ALL ON TABLE "public"."monthly_leaderboard_winners" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."password_change_audit" TO "anon";
+GRANT ALL ON TABLE "public"."password_change_audit" TO "authenticated";
+GRANT ALL ON TABLE "public"."password_change_audit" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."password_reset_logs" TO "anon";
+GRANT ALL ON TABLE "public"."password_reset_logs" TO "authenticated";
+GRANT ALL ON TABLE "public"."password_reset_logs" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."points_transactions" TO "anon";
+GRANT ALL ON TABLE "public"."points_transactions" TO "authenticated";
+GRANT ALL ON TABLE "public"."points_transactions" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."profile_points_view" TO "anon";
+GRANT ALL ON TABLE "public"."profile_points_view" TO "authenticated";
+GRANT ALL ON TABLE "public"."profile_points_view" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."user_roles" TO "anon";
+GRANT ALL ON TABLE "public"."user_roles" TO "authenticated";
+GRANT ALL ON TABLE "public"."user_roles" TO "service_role";
+
+
+GRANT ALL ON TABLE "public"."voucher_redemptions" TO "anon";
+GRANT ALL ON TABLE "public"."voucher_redemptions" TO "authenticated";
+GRANT ALL ON TABLE "public"."voucher_redemptions" TO "service_role";
+
+
+GRANT ALL ON TABLE "public"."vouchers" TO "anon";
+GRANT ALL ON TABLE "public"."vouchers" TO "authenticated";
+GRANT ALL ON TABLE "public"."vouchers" TO "service_role";
+
+
+GRANT ALL ON TABLE "public"."xp_history" TO "anon";
+GRANT ALL ON TABLE "public"."xp_history" TO "authenticated";
+GRANT ALL ON TABLE "public"."xp_history" TO "service_role";
+
+
+GRANT ALL ON TABLE "public"."xp_transactions" TO "anon";
+GRANT ALL ON TABLE "public"."xp_transactions" TO "authenticated";
+GRANT ALL ON TABLE "public"."xp_transactions" TO "service_role";
+
+
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "postgres";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "anon";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "service_role";
+
+
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "postgres";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "anon";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "service_role";
+
+
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "postgres";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
+
+drop extension if exists "pg_net";
+
+CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+CREATE TRIGGER on_auth_user_created_set_provider AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_oauth_signup();

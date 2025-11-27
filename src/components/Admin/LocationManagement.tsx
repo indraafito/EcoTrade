@@ -53,11 +53,19 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [selectedQRLocation, setSelectedQRLocation] = useState<Location | null>(null);
   const [isGeneratingQR, setIsGeneratingQR] = useState(false);
-  const [formData, setFormData] = useState<Omit<Location, 'id' | 'created_at'>>({ 
+  
+  // FIX: State dengan string untuk latitude/longitude agar paste lancar
+  const [formData, setFormData] = useState<{
+    name: string;
+    address: string;
+    latitude: string;
+    longitude: string;
+    is_active: boolean;
+  }>({ 
     name: '',
     address: '',
-    latitude: 0,
-    longitude: 0,
+    latitude: '',
+    longitude: '',
     is_active: true
   });
 
@@ -67,7 +75,6 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
 
   const fetchLocations = async () => {
     try {
-      // FIX: Gunakan destructuring yang konsisten
       const { data: locationsData, error: locationsError } = await (supabase as any)
         .from("locations")
         .select("*")
@@ -112,13 +119,12 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
     }
   };
 
+  // FIX: Handler yang lebih sederhana - langsung simpan value tanpa parsing
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'latitude' || name === 'longitude' 
-        ? parseFloat(value) || 0 
-        : value
+      [name]: value
     }));
   };
 
@@ -133,8 +139,8 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
     setFormData({
       name: '',
       address: '',
-      latitude: 0,
-      longitude: 0,
+      latitude: '',
+      longitude: '',
       is_active: true
     });
     setCurrentLocation(null);
@@ -142,11 +148,12 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
 
   const handleEdit = (location: Location) => {
     setCurrentLocation(location);
+    // FIX: Convert number ke string untuk edit
     setFormData({
       name: location.name,
       address: location.address,
-      latitude: location.latitude,
-      longitude: location.longitude,
+      latitude: location.latitude.toString(),
+      longitude: location.longitude.toString(),
       is_active: location.is_active
     });
     setIsDialogOpen(true);
@@ -186,29 +193,23 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
     }
   };
 
-  // FIX: Simplified QR code logic - no race conditions
   const showQRCode = async (location: Location) => {
     try {
-      // Always show dialog first
       setSelectedQRLocation(location);
       setQrDialogOpen(true);
 
-      // If QR code doesn't exist, generate it
       if (!location.qr_code_url) {
         setIsGeneratingQR(true);
         
         try {
-          // Generate QR code
           const qrCodeUrl = await generateLocationQRCodeAPI({
             id: location.id,
             name: location.name
           });
           
-          // Save to database
           const result = await saveLocationQRCode(location.id, qrCodeUrl);
           
           if (result.success) {
-            // Update both dialog and list
             const updatedLocation = { ...location, qr_code_url: qrCodeUrl };
             setSelectedQRLocation(updatedLocation);
             fetchLocations();
@@ -252,16 +253,46 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
     }
   };
 
+  // FIX: Submit dengan validasi dan parsing
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validasi input
+    const latitude = parseFloat(formData.latitude);
+    const longitude = parseFloat(formData.longitude);
+    
+    if (isNaN(latitude) || isNaN(longitude)) {
+      toast.error('Latitude dan Longitude harus berupa angka yang valid');
+      return;
+    }
+    
+    if (latitude < -90 || latitude > 90) {
+      toast.error('Latitude harus antara -90 dan 90');
+      return;
+    }
+    
+    if (longitude < -180 || longitude > 180) {
+      toast.error('Longitude harus antara -180 dan 180');
+      return;
+    }
+
     setIsSubmitting(true);
+
+    // FIX: Prepare data dengan parsing number
+    const submitData = {
+      name: formData.name,
+      address: formData.address,
+      latitude: latitude,
+      longitude: longitude,
+      is_active: formData.is_active
+    };
 
     try {
       if (currentLocation?.id) {
         // Update existing location
         const { error } = await supabase
           .from('locations')
-          .update(formData)
+          .update(submitData)
           .eq('id', currentLocation.id);
 
         if (error) throw error;
@@ -270,7 +301,7 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
         // Create new location
         const { data, error } = await supabase
           .from("locations")
-          .insert([formData])
+          .insert([submitData])
           .select()
           .single();
 
@@ -391,6 +422,9 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
                     placeholder="Contoh: -6.2088"
                     required
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Range: -90 sampai 90
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="longitude">Longitude *</Label>
@@ -404,6 +438,9 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
                     placeholder="Contoh: 106.8456"
                     required
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Range: -180 sampai 180
+                  </p>
                 </div>
               </div>
               <div className="flex items-center justify-between pt-2">
@@ -421,6 +458,7 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
               </div>
               <div className="text-xs text-muted-foreground mt-2">
                 <p>* Wajib diisi</p>
+                <p className="mt-1">💡 Tips: Anda bisa copy-paste koordinat dari Google Maps</p>
               </div>
             </div>
             <DialogFooter>

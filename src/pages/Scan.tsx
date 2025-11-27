@@ -1167,9 +1167,7 @@ const simulateQRScan = async () => {
           <DialogFooter className="gap-2">
             <Button 
               onClick={() => {
-                console.log('🔘🔘🔘 BUTTON CLICKED!!!');
-                alert('Button clicked! Check console for details.');
-                
+                console.log('🔘🔘🔘 BUTTON CLICKED!!!');                
                 console.log('🔘 === KONFIRMASI BUTTON CLICKED ===');
                 console.log('  - Current isProcessing:', isProcessing);
                 console.log('  - confirmDisposalRef.current:', confirmDisposalRef.current);
@@ -1189,7 +1187,7 @@ const simulateQRScan = async () => {
                 });
               }} 
               disabled={isProcessing}
-              className="flex-1 h-12 rounded-xl font-semibold bg-red-500 hover:bg-red-600"
+              className="flex-1 h-12 rounded-xl font-semibold bg-primary hover:bg-primary/90 text-white"
             >
               {isProcessing ? "Memproses..." : "Konfirmasi"}
             </Button>
