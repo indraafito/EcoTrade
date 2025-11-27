@@ -1982,6 +1982,13 @@ FOR UPDATE USING (
     WHERE ur.user_id = auth.uid() 
     AND ur.role = 'admin'
   )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
 );
 
 -- 5. Admin users can delete ranking tiers
@@ -2034,6 +2041,13 @@ FOR UPDATE USING (
     WHERE ur.user_id = auth.uid() 
     AND ur.role = 'admin'
   )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
 );
 
 -- 5. Admin users can delete locations
@@ -2081,6 +2095,13 @@ FOR INSERT WITH CHECK (
 -- 4. Admin users can update vouchers
 CREATE POLICY "Admin can update vouchers" ON "public"."vouchers" 
 FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+)
+WITH CHECK (
   EXISTS (
     SELECT 1 FROM public.user_roles ur 
     WHERE ur.user_id = auth.uid() 
