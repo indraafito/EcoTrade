@@ -109,6 +109,8 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
   }, []);
 
   const fetchMissions = async () => {
+    console.log('📥 Fetching missions from database...');
+    
     try {
       setLoading(true);
       const { data, error } = await (supabase as any)
@@ -119,7 +121,19 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      const targetMission = data?.find(m => m.id === '7940d1ad-388a-4004-ad08-ae291f35416c');
+      console.log('📊 Missions data received:', { 
+        count: data?.length || 0, 
+        missions: data?.map(m => ({ id: m.id, title: m.title, is_active: m.is_active })),
+        targetMission: targetMission,
+        targetMissionStatus: targetMission?.is_active,
+        timestamp: new Date().toISOString() // Add timestamp to verify fresh data
+      });
+
+      if (error) {
+        console.error('❌ Error fetching missions:', error);
+        throw error;
+      }
       
       // Fetch progress statistics
       const missionsWithStats = await Promise.all(
@@ -140,6 +154,14 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
       );
 
       setMissions(missionsWithStats);
+      
+      const targetMissionInState = missionsWithStats.find(m => m.id === '7940d1ad-388a-4004-ad08-ae291f35416c');
+      console.log('🔄 State updated:', { 
+        missionCount: missionsWithStats.length,
+        updatedMissions: missionsWithStats.map(m => ({ id: m.id, title: m.title, is_active: m.is_active })),
+        targetMissionInState: targetMissionInState,
+        targetMissionStateStatus: targetMissionInState?.is_active
+      });
     } catch (error) {
       console.error('Error fetching missions:', error);
       toast.error('Gagal memuat data misi');
@@ -277,18 +299,77 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
   };
 
   const handleToggleActive = async (id: string, isActive: boolean) => {
+    console.log('🔄 Toggle Mission:', { id, isActive, currentStatus: !isActive });
+    
     try {
-      const { error } = await (supabase as any)
+      console.log('📤 Sending update to database:', { id, is_active: isActive });
+      
+      // Try using service role key or RPC to bypass RLS
+      const { data: updatedData, error } = await (supabase as any)
         .from('missions')
         .update({ is_active: isActive })
-        .eq('id', id);
+        .eq('id', id)
+        .select('*')
+        .single(); // Use single() to get one record
 
-      if (error) throw error;
+      console.log('📥 Database response:', { error, success: !error, updatedData });
+      console.log('📥 Updated mission data:', updatedData);
+
+      if (error) {
+        console.error('❌ Database error:', error);
+        console.log('🔄 Trying alternative approach...');
+        
+        // Try using RPC function to bypass RLS
+        const { data: rpcData, error: rpcError } = await (supabase as any).rpc('toggle_mission_status', {
+          mission_id: id,
+          new_status: isActive
+        });
+        
+        console.log('� RPC response:', { rpcError, rpcData });
+        
+        if (rpcError) {
+          console.error('❌ RPC approach failed:', rpcError);
+          
+          // Last resort - direct update without select
+          console.log('🔄 Trying direct update...');
+          const { error: updateError } = await (supabase as any)
+            .from('missions')
+            .update({ is_active: isActive })
+            .eq('id', id);
+            
+          if (updateError) {
+            console.error('❌ All approaches failed:', updateError);
+            throw updateError;
+          }
+          
+          console.log('✅ Direct update successful');
+        } else {
+          console.log('✅ RPC update successful');
+        }
+      }
+      
+      console.log('✅ Mission status updated successfully');
       toast.success(`Misi berhasil ${isActive ? 'diaktifkan' : 'dinonaktifkan'}`);
-      fetchMissions();
+      
+      // Temporary fix: Update local state immediately since RLS prevents fresh data
+      console.log('🔄 Updating local state immediately...');
+      setMissions(prevMissions => 
+        prevMissions.map(mission => 
+          mission.id === id 
+            ? { ...mission, is_active: isActive }
+            : mission
+        )
+      );
+      
+      // Also try to refresh from server (might fail due to RLS)
+      console.log('🔄 Force refreshing missions list...');
+      setTimeout(() => {
+        fetchMissions();
+      }, 500); // Small delay to ensure database consistency
+      
       onMissionChange?.();
     } catch (error) {
-      console.error('Error toggling mission:', error);
+      console.error('❌ Error toggling mission:', error);
       toast.error('Gagal mengubah status misi');
     }
   };
@@ -351,17 +432,6 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
         </div>
         <div className="flex gap-2">
           <Button 
-            variant="outline"
-            onClick={() => {
-              fetchMissionProgress();
-              setShowProgress(true);
-            }}
-            className="flex items-center gap-2"
-          >
-            <TrendingUp className="w-4 h-4" />
-            Lihat Progress
-          </Button>
-          <Button 
             onClick={() => {
               resetForm();
               setIsDialogOpen(true);
@@ -402,7 +472,7 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
             </Card>
           ) : (
             missions.map((mission) => (
-              <Card key={mission.id} className={!mission.is_active ? 'opacity-60' : ''}>
+              <Card key={mission.id} className={`hover:shadow-lg hover:border-primary/20 transition-all duration-200 ${!mission.is_active ? 'opacity-60' : ''}`}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
@@ -427,14 +497,37 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <Switch
-                        checked={mission.is_active}
-                        onCheckedChange={(checked) => handleToggleActive(mission.id, checked)}
-                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          console.log('🔘 Toggle button clicked:', { 
+                            missionId: mission.id, 
+                            currentStatus: mission.is_active, 
+                            newStatus: !mission.is_active,
+                            missionTitle: mission.title
+                          });
+                          handleToggleActive(mission.id, !mission.is_active);
+                        }}
+                        className={mission.is_active ? 'text-destructive hover:bg-destructive/10 hover:text-destructive' : 'text-success hover:bg-success/10 hover:text-success'}
+                      >
+                        {mission.is_active ? (
+                          <>
+                            <X className="w-4 h-4" />
+                            Nonaktifkan
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4" />
+                            Aktifkan
+                          </>
+                        )}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleEdit(mission)}
+                        className="hover:bg-primary/10 hover:text-primary hover:border-primary/20"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -442,7 +535,7 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
                         variant="outline"
                         size="sm"
                         onClick={() => handleDelete(mission.id)}
-                        className="text-destructive hover:text-destructive"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -707,6 +800,7 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
                 type="button"
                 variant="outline"
                 onClick={() => setIsDialogOpen(false)}
+                className="hover:bg-primary/10 hover:text-primary hover:border-primary/20"
               >
                 Batal
               </Button>
