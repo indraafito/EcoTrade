@@ -432,6 +432,7 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
                   resetForm();
                 }}
                 disabled={isSubmitting}
+                className="hover:bg-primary/10 hover:text-primary hover:border-primary/20"
               >
                 Batal
               </Button>
@@ -471,7 +472,7 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
           locations.map((location) => (
             <Card 
               key={location.id} 
-              className={`hover:shadow-md transition-shadow ${
+              className={`hover:shadow-lg hover:border-primary/20 transition-all duration-200 ${
                 !location.is_active ? 'opacity-70' : ''
               }`}
             >
@@ -509,6 +510,7 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
                       variant="outline"
                       size="sm"
                       onClick={() => handleEdit(location)}
+                      className="hover:bg-primary/10 hover:text-primary hover:border-primary/20"
                     >
                       <Edit className="h-3.5 w-3.5 mr-1.5" />
                       Edit
@@ -517,6 +519,7 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
                       variant="outline"
                       size="sm"
                       onClick={() => showQRCode(location)}
+                      className="hover:bg-primary/10 hover:text-primary hover:border-primary/20"
                     >
                       <QrCode className="h-3.5 w-3.5 mr-1.5" />
                       QR
@@ -525,7 +528,7 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
                       variant="outline"
                       size="sm"
                       onClick={() => toggleStatus(location)}
-                      className={location.is_active ? 'text-destructive' : 'text-green-600'}
+                      className={location.is_active ? 'text-destructive hover:bg-destructive/10 hover:text-destructive' : 'text-success hover:bg-success/10 hover:text-success'}
                     >
                       {location.is_active ? (
                         <>
@@ -543,7 +546,7 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-destructive hover:text-destructive/90"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => handleDelete(location.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -603,7 +606,7 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
                 <Button
                   variant="outline"
                   onClick={() => downloadQRCode(selectedQRLocation)}
-                  className="flex-1"
+                  className="flex-1 hover:bg-primary/10 hover:text-primary hover:border-primary/20"
                   disabled={!selectedQRLocation.qr_code_url || isGeneratingQR}
                 >
                   <Download className="w-4 h-4 mr-2" />
