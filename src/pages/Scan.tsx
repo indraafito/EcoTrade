@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import BottomNav from "@/components/BottomNav";
+import { BottomNav } from "@/components";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { QrCode, CheckCircle2, Scan, MapPin, Package, Weight, Award, Leaf, AlertCircle, Camera, CameraOff, X } from "lucide-react";

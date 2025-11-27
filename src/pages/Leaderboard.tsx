@@ -1,8 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import BottomNav from "@/components/BottomNav";
-import Loading from "@/components/Loading";
+import { BottomNav, Loading } from "@/components";
 import {
   Trophy,
   Award,

@@ -1,8 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import BottomNav from "@/components/BottomNav";
-import { Card, CardContent } from "@/components/ui/card";
-import Loading from "@/components/Loading";
+import { BottomNav, Loading } from "@/components";
 import {
   Dialog,
   DialogContent,

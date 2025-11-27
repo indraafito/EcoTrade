@@ -1,4 +1,4 @@
-import { useDarkMode } from "@/components/DarkMode";
+import { useDarkMode } from "@/components";
 import { Button } from "@/components/ui/button";
 import { Sun, Moon } from "lucide-react";
 

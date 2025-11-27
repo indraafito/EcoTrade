@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import BottomNav from "@/components/BottomNav";
-import { Button } from "@/components/ui/button";
-import Loading from "@/components/Loading";
+import { BottomNav, Loading } from "@/components";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -18,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useDarkMode } from "@/components/DarkMode";
+import { useDarkMode } from "@/components";
 import { Barcode } from "lucide-react";
 import BarcodeDisplay from "react-barcode";
 

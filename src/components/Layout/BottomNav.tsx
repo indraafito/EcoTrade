@@ -1,4 +1,4 @@
-import { NavLink } from "@/components/NavLink";
+import { NavLink } from "@/components";
 import { Home, MapPin, QrCode, User, Gift } from "lucide-react";
 
 const BottomNav = () => {

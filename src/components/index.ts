@@ -13,9 +13,6 @@ export { default as PasswordManagement } from './Auth/PasswordManagement';
 // Admin Components
 export * from './Admin';
 
-// UI Components
-export * from './ui';
-
 // Redirect Components
 export { default as AuthRedirect } from './Redirect/AuthRedirect';
 export { default as ForgotPasswordRedirect } from './Redirect/ForgotPasswordRedirect';
