@@ -292,7 +292,7 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {vouchers.length === 0 ? (
           <div className="col-span-full text-center py-12 border-2 border-dashed rounded-lg">
-            <Gift className="mx-auto h-12 w-12 text-muted-foreground" />
+            <GiftIcon className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-2 text-sm font-medium">Belum ada voucher</h3>
             <p className="mt-1 text-sm text-muted-foreground">
               Mulai dengan menambahkan voucher baru
