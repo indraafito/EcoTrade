@@ -67,6 +67,8 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
   }, []);
 
   const fetchRankingTiers = async () => {
+    console.log('📥 Fetching ranking tiers from database...');
+    
     try {
       setLoading(true);
       const { data, error } = await (supabase as any)
@@ -74,10 +76,22 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
         .select('*')
         .order('sort_order', { ascending: true });
 
-      if (error) throw error;
+      console.log('📊 Ranking tiers response:', { 
+        data: data, 
+        error: error,
+        count: data?.length || 0,
+        timestamp: new Date().toISOString()
+      });
+
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
+      
       setRankingTiers(data || []);
+      console.log('✅ Ranking tiers loaded successfully:', data?.length || 0, 'items');
     } catch (error) {
-      console.error('Error fetching ranking tiers:', error);
+      console.error('❌ Error fetching ranking tiers:', error);
       toast.error('Gagal memuat data ranking tiers');
     } finally {
       setLoading(false);
@@ -98,6 +112,12 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('📝 Submitting ranking tier:', {
+      isEditing: !!editingTier,
+      formData: formData,
+      editingTierId: editingTier?.id
+    });
+    
     try {
       const tierData = {
         name: formData.name,
@@ -107,32 +127,53 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
         is_active: formData.is_active
       };
 
+      console.log('🔍 Tier data to save:', tierData);
+
       // Validate threshold points uniqueness
       const existingThreshold = rankingTiers.find(
         tier => tier.threshold_points === formData.threshold_points && tier.id !== editingTier?.id
       );
 
       if (existingThreshold) {
+        console.log('⚠️ Duplicate threshold found:', existingThreshold);
         toast.error('Threshold poin sudah digunakan oleh ranking tier lain');
         return;
       }
 
       if (editingTier) {
         // Update existing tier
-        const { error } = await (supabase as any)
+        console.log('🔄 Updating existing tier:', editingTier.id);
+        const { data, error } = await (supabase as any)
           .from('ranking_tiers')
           .update(tierData)
-          .eq('id', editingTier.id);
+          .eq('id', editingTier.id)
+          .select();
 
-        if (error) throw error;
+        console.log('📊 Update response:', { data, error });
+
+        if (error) {
+          console.error('❌ Update error:', error);
+          throw error;
+        }
+        
+        console.log('✅ Ranking tier updated successfully');
         toast.success('Ranking tier berhasil diperbarui');
       } else {
         // Create new tier
-        const { error } = await (supabase as any)
+        console.log('➕ Creating new tier');
+        const { data, error } = await (supabase as any)
           .from('ranking_tiers')
-          .insert(tierData);
+          .insert(tierData)
+          .select();
 
-        if (error) throw error;
+        console.log('📊 Insert response:', { data, error });
+
+        if (error) {
+          console.error('❌ Insert error:', error);
+          throw error;
+        }
+        
+        console.log('✅ Ranking tier created successfully:', data);
         toast.success('Ranking tier berhasil ditambahkan');
       }
 
@@ -141,7 +182,7 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
       fetchRankingTiers();
       onRankingTiersChange?.();
     } catch (error) {
-      console.error('Error saving ranking tier:', error);
+      console.error('❌ Error saving ranking tier:', error);
       toast.error('Gagal menyimpan ranking tier');
     }
   };
@@ -159,37 +200,61 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus ranking tier ini?')) return;
+    console.log('🗑️ Attempting to delete ranking tier:', id);
+    
+    if (!confirm('Apakah Anda yakin ingin menghapus ranking tier ini?')) {
+      console.log('❌ Delete cancelled by user');
+      return;
+    }
 
     try {
-      const { error } = await (supabase as any)
+      console.log('🔄 Deleting ranking tier from database...');
+      const { data, error } = await (supabase as any)
         .from('ranking_tiers')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
-      if (error) throw error;
+      console.log('📊 Delete response:', { data, error });
+
+      if (error) {
+        console.error('❌ Delete error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Ranking tier deleted successfully:', data);
       toast.success('Ranking tier berhasil dihapus');
       fetchRankingTiers();
       onRankingTiersChange?.();
     } catch (error) {
-      console.error('Error deleting ranking tier:', error);
+      console.error('❌ Error deleting ranking tier:', error);
       toast.error('Gagal menghapus ranking tier');
     }
   };
 
   const handleToggleActive = async (id: string, isActive: boolean) => {
+    console.log('🔄 Toggling ranking tier status:', { id, isActive });
+    
     try {
-      const { error } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from('ranking_tiers')
         .update({ is_active: isActive })
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
-      if (error) throw error;
+      console.log('📊 Toggle response:', { data, error });
+
+      if (error) {
+        console.error('❌ Toggle error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Ranking tier status updated successfully');
       toast.success(`Ranking tier berhasil ${isActive ? 'diaktifkan' : 'dinonaktifkan'}`);
       fetchRankingTiers();
       onRankingTiersChange?.();
     } catch (error) {
-      console.error('Error toggling ranking tier:', error);
+      console.error('❌ Error toggling ranking tier:', error);
       toast.error('Gagal mengubah status ranking tier');
     }
   };
