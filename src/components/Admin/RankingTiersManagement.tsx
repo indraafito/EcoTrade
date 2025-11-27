@@ -348,7 +348,7 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
           <p className="mt-2 text-muted-foreground">Memuat data ranking tiers...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
           {rankingTiers.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center">
