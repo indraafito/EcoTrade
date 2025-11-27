@@ -277,7 +277,7 @@ const AdminDashboard = () => {
   return (
     <AdminProtectedRoute>
       <div className="min-h-screen bg-background">
-      <div className="bg-primary p-6 rounded-b-3xl shadow-eco mb-6">
+        <div className="bg-primary p-6 rounded-b-3xl shadow-eco mb-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white mb-2">Admin Dashboard</h1>
@@ -293,6 +293,7 @@ const AdminDashboard = () => {
             Logout
           </Button>
         </div>
+      </div>
       </div>
 
       <div className="px-6 pb-6">
