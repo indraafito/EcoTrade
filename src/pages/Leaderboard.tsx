@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import BottomNav from "@/components/BottomNav";
@@ -17,6 +17,7 @@ import {
   Calendar,
   Gift,
   Zap,
+  Gem,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,12 +26,19 @@ interface LeaderboardEntry {
   username: string;
   full_name: string;
   avatar_url: string | null;
-  points: number; // Ini sebenarnya XP dari view
+  points: number;
   total_bottles: number;
   total_weight_kg: number;
   city: string | null;
   rank_name: string | null;
   position: number;
+}
+
+interface AchievedBadge {
+  id: string;
+  name: string;
+  threshold_points: number;
+  achieved_date: Date;
 }
 
 interface RankingTier {
@@ -67,16 +75,34 @@ const Leaderboard = () => {
   const [filterCity, setFilterCity] = useState<string>("all");
   const [cities, setCities] = useState<string[]>([]);
   const [showPastWinners, setShowPastWinners] = useState(false);
+  const [showRankingTiers, setShowRankingTiers] = useState(false);
+  const [achievedBadges, setAchievedBadges] = useState<AchievedBadge[]>([]);
+
+  // Ref untuk scroll ke posisi user
+  const currentUserRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchLeaderboard();
     fetchRankingTiers();
     fetchPastWinners();
+    fetchAchievedBadges();
   }, []);
 
   useEffect(() => {
     filterLeaderboard();
   }, [searchQuery, filterCity, leaderboard]);
+
+  // Auto scroll ke posisi user setelah data dimuat
+  useEffect(() => {
+    if (!isLoading && currentUser && currentUser.position > 3 && !searchQuery) {
+      setTimeout(() => {
+        currentUserRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 500);
+    }
+  }, [isLoading, currentUser, searchQuery]);
 
   const fetchLeaderboard = async () => {
     try {
@@ -84,7 +110,8 @@ const Leaderboard = () => {
         data: { user },
       } = await supabase.auth.getUser();
 
-      const { data, error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
         .from("leaderboard_view")
         .select("*")
         .order("position", { ascending: true })
@@ -92,10 +119,9 @@ const Leaderboard = () => {
 
       if (error) throw error;
 
-      const leaderboardData = data || [];
+      const leaderboardData = (data as LeaderboardEntry[]) || [];
       setLeaderboard(leaderboardData);
 
-      // Extract unique cities
       const uniqueCities = [
         ...new Set(
           leaderboardData
@@ -105,14 +131,13 @@ const Leaderboard = () => {
       ] as string[];
       setCities(uniqueCities);
 
-      // Find current user in leaderboard
       if (user) {
         const userEntry = leaderboardData.find(
           (entry) => entry.user_id === user.id
         );
         setCurrentUser(userEntry || null);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching leaderboard:", error);
       toast.error("Gagal memuat leaderboard");
     } finally {
@@ -122,22 +147,24 @@ const Leaderboard = () => {
 
   const fetchRankingTiers = async () => {
     try {
-      const { data, error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
         .from("ranking_tiers")
         .select("*")
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
 
       if (error) throw error;
-      setRankingTiers(data || []);
-    } catch (error: any) {
+      setRankingTiers((data as RankingTier[]) || []);
+    } catch (error: unknown) {
       console.error("Error fetching ranking tiers:", error);
     }
   };
 
   const fetchPastWinners = async () => {
     try {
-      const { data, error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
         .from("monthly_leaderboard_winners")
         .select(
           `
@@ -155,21 +182,58 @@ const Leaderboard = () => {
 
       if (error) throw error;
 
-      const winners = (data || []).map((w: any) => ({
-        user_id: w.user_id,
-        username: w.profiles?.username || "Unknown",
-        full_name: w.profiles?.full_name || "Unknown",
-        avatar_url: w.profiles?.avatar_url || null,
-        position: w.position,
-        xp: w.xp,
-        reward_points: w.reward_points,
-        month: w.month,
-        year: w.year,
-      }));
+      const winners = (data || []).map((w: unknown) => {
+        const winner = w as {
+          user_id: string;
+          position: number;
+          xp: number;
+          reward_points: number;
+          month: number;
+          year: number;
+          profiles?: {
+            username?: string;
+            full_name?: string;
+            avatar_url?: string;
+          };
+        };
+        return {
+          user_id: winner.user_id,
+          username: winner.profiles?.username || "Unknown",
+          full_name: winner.profiles?.full_name || "Unknown",
+          avatar_url: winner.profiles?.avatar_url || null,
+          position: winner.position,
+          xp: winner.xp,
+          reward_points: winner.reward_points,
+          month: winner.month,
+          year: winner.year,
+        };
+      });
 
       setPastWinners(winners);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching past winners:", error);
+    }
+  };
+
+  const fetchAchievedBadges = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("achieved_badges")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("achieved_date", { ascending: false });
+
+      if (error) throw error;
+      setAchievedBadges(data || []);
+    } catch (error: unknown) {
+      console.error("Error fetching achieved badges:", error);
     }
   };
 
@@ -232,6 +296,50 @@ const Leaderboard = () => {
     }
   };
 
+  const getTierDescription = (tier: RankingTier) => {
+    const { name } = tier;
+    let description = "";
+
+    switch (name.toLowerCase()) {
+      case "bronze":
+        description = "Tier untuk pemula yang baru memulai.";
+        break;
+      case "silver":
+        description = "Tier untuk pengguna menengah.";
+        break;
+      case "gold":
+        description = "Tier untuk pengguna lanjutan.";
+        break;
+      case "platinum":
+        description = "Tier premium dengan fitur eksklusif.";
+        break;
+      case "diamond":
+        description = "Tier tertinggi dengan status elite.";
+        break;
+      default:
+        description = `Tier ${name}.`;
+    }
+
+    return description;
+  };
+
+  const getTierIcon = (tierName: string) => {
+    switch (tierName?.toLowerCase()) {
+      case "bronze":
+        return <Medal className="w-8 h-8 text-orange-600" />;
+      case "silver":
+        return <Medal className="w-8 h-8 text-gray-500" />;
+      case "gold":
+        return <Crown className="w-8 h-8 text-yellow-500" />;
+      case "platinum":
+        return <Star className="w-8 h-8 text-cyan-500" />;
+      case "diamond":
+        return <Gem className="w-8 h-8 text-blue-500" />;
+      default:
+        return <Award className="w-8 h-8 text-primary" />;
+    }
+  };
+
   const getMonthName = (month: number) => {
     const months = [
       "Januari",
@@ -257,6 +365,9 @@ const Leaderboard = () => {
   if (isLoading) {
     return <Loading />;
   }
+
+  // Gunakan leaderboard asli untuk top 3 podium, bukan filtered
+  const top3 = leaderboard.slice(0, 3);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1DBF73]/5 via-background to-primary/5 pb-28">
@@ -302,19 +413,16 @@ const Leaderboard = () => {
                 🏆 Hadiah Bulanan
               </p>
               <div className="grid grid-cols-3 gap-2">
-                {/* Gold Medal */}
                 <div className="bg-gradient-to-br from-yellow-500/30 to-amber-600/30 dark:from-yellow-500/20 dark:to-amber-600/20 rounded-lg p-2 text-center border border-yellow-500/30">
                   <Medal className="w-5 h-5 text-yellow-500 dark:text-yellow-400 mx-auto mb-1" />
                   <p className="text-foreground font-black text-sm">1000</p>
                   <p className="text-muted-foreground text-[10px]">Poin</p>
                 </div>
-                {/* Silver Medal */}
                 <div className="bg-gradient-to-br from-gray-400/30 to-gray-500/30 dark:from-gray-400/20 dark:to-gray-500/20 rounded-lg p-2 text-center border border-gray-400/30">
                   <Medal className="w-5 h-5 text-gray-400 dark:text-gray-300 mx-auto mb-1" />
                   <p className="text-foreground font-black text-sm">500</p>
                   <p className="text-muted-foreground text-[10px]">Poin</p>
                 </div>
-                {/* Bronze Medal */}
                 <div className="bg-gradient-to-br from-orange-600/30 to-amber-700/30 dark:from-orange-600/20 dark:to-amber-700/20 rounded-lg p-2 text-center border border-orange-600/30">
                   <Medal className="w-5 h-5 text-orange-600 dark:text-orange-500 mx-auto mb-1" />
                   <p className="text-foreground font-black text-sm">250</p>
@@ -362,9 +470,7 @@ const Leaderboard = () => {
                       className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 border ${getTierBadgeColor(
                         currentUser.rank_name
                       )}`}
-                    >
-                      {currentUser.rank_name}
-                    </span>
+                    ></span>
                   )}
                 </div>
               </div>
@@ -461,6 +567,97 @@ const Leaderboard = () => {
         </div>
       )}
 
+      {/* Ranking Tiers Toggle */}
+      {rankingTiers.length > 0 && (
+        <div className="px-6 mb-4">
+          <button
+            onClick={() => setShowRankingTiers(!showRankingTiers)}
+            className="w-full bg-card/80 backdrop-blur-sm rounded-xl p-4 border border-border/50 hover:shadow-md transition-all"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Award className="w-5 h-5 text-primary" />
+                <span className="font-bold text-foreground">
+                  Sistem Ranking
+                </span>
+              </div>
+              <span className="text-primary text-sm">
+                {showRankingTiers ? "Sembunyikan ▲" : "Lihat ▼"}
+              </span>
+            </div>
+          </button>
+
+          {showRankingTiers && (
+            <div className="mt-3 space-y-3">
+              {rankingTiers.map((tier) => (
+                <div
+                  key={tier.id}
+                  className="bg-card/80 backdrop-blur-sm p-4 rounded-xl border border-border/50"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      {getTierIcon(tier.name)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span
+                          className={`text-sm font-bold px-2 py-1 rounded border ${getTierBadgeColor(
+                            tier.name
+                          )}`}
+                        >
+                          {tier.name.toUpperCase()}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Min. {tier.threshold_points} XP
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {getTierDescription(tier)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Achieved Badges Section */}
+      {achievedBadges.length > 0 && (
+        <div className="px-6 mb-4">
+          <div className="bg-card/80 backdrop-blur-sm rounded-xl p-4 border border-border/50">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <span className="font-bold text-foreground">
+                Badge yang Diraih
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {achievedBadges.map((badge) => (
+                <div
+                  key={badge.id}
+                  className="bg-gradient-to-br from-primary/10 to-purple-500/10 rounded-lg p-3 border border-primary/20 text-center"
+                >
+                  <div className="flex items-center justify-center mb-2">
+                    <Award className="w-8 h-8 text-primary" />
+                  </div>
+                  <p className="font-bold text-foreground text-sm mb-1">
+                    {badge.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {badge.threshold_points} XP
+                  </p>
+                  <p className="text-xs text-primary font-semibold mt-1">
+                    {new Date(badge.achieved_date).toLocaleDateString("id-ID")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search and Filter */}
       <div className="px-6 mb-4">
         <div className="flex gap-2">
@@ -474,41 +671,27 @@ const Leaderboard = () => {
               className="w-full pl-10 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
-          <select
-            value={filterCity}
-            onChange={(e) => setFilterCity(e.target.value)}
-            className="px-4 py-2.5 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-          >
-            <option value="all">Semua Kota</option>
-            {cities.map((city) => (
-              <option key={city} value={city}>
-                {city}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
-      {/* Top 3 Podium */}
-      {filteredLeaderboard.length > 0 && (
+      {/* Top 3 Podium - SELALU TAMPILKAN TOP 3 ASLI */}
+      {top3.length > 0 && (
         <div className="px-6 mb-6">
           <div className="flex items-end justify-center gap-2 mb-6">
             {/* Rank 2 */}
-            {filteredLeaderboard[1] && (
+            {top3[1] && (
               <div className="flex-1 text-center">
                 <div className="relative mb-2">
                   <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-300 to-gray-500 flex items-center justify-center mx-auto border-4 border-white dark:border-gray-800 shadow-lg">
-                    {filteredLeaderboard[1].avatar_url ? (
+                    {top3[1].avatar_url ? (
                       <img
-                        src={filteredLeaderboard[1].avatar_url}
-                        alt={filteredLeaderboard[1].username}
+                        src={top3[1].avatar_url}
+                        alt={top3[1].username}
                         className="w-full h-full rounded-full object-cover"
                       />
                     ) : (
                       <span className="text-white font-bold text-xl">
-                        {filteredLeaderboard[1].username
-                          .charAt(0)
-                          .toUpperCase()}
+                        {top3[1].username.charAt(0).toUpperCase()}
                       </span>
                     )}
                   </div>
@@ -517,10 +700,10 @@ const Leaderboard = () => {
                   </div>
                 </div>
                 <p className="font-bold text-foreground text-sm truncate">
-                  {filteredLeaderboard[1].username}
+                  {top3[1].username}
                 </p>
                 <p className="text-lg font-black text-purple-600">
-                  {filteredLeaderboard[1].points}
+                  {top3[1].points}
                 </p>
                 <p className="text-xs text-muted-foreground">XP</p>
                 <div className="bg-gradient-to-br from-gray-300 to-gray-500 h-24 rounded-t-xl mt-2" />
@@ -528,21 +711,19 @@ const Leaderboard = () => {
             )}
 
             {/* Rank 1 */}
-            {filteredLeaderboard[0] && (
+            {top3[0] && (
               <div className="flex-1 text-center">
                 <div className="relative mb-2">
                   <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center mx-auto border-4 border-white dark:border-gray-800 shadow-xl">
-                    {filteredLeaderboard[0].avatar_url ? (
+                    {top3[0].avatar_url ? (
                       <img
-                        src={filteredLeaderboard[0].avatar_url}
-                        alt={filteredLeaderboard[0].username}
+                        src={top3[0].avatar_url}
+                        alt={top3[0].username}
                         className="w-full h-full rounded-full object-cover"
                       />
                     ) : (
                       <span className="text-white font-bold text-2xl">
-                        {filteredLeaderboard[0].username
-                          .charAt(0)
-                          .toUpperCase()}
+                        {top3[0].username.charAt(0).toUpperCase()}
                       </span>
                     )}
                   </div>
@@ -554,10 +735,10 @@ const Leaderboard = () => {
                   </div>
                 </div>
                 <p className="font-bold text-foreground text-base truncate">
-                  {filteredLeaderboard[0].username}
+                  {top3[0].username}
                 </p>
                 <p className="text-xl font-black text-purple-600">
-                  {filteredLeaderboard[0].points}
+                  {top3[0].points}
                 </p>
                 <p className="text-xs text-muted-foreground">XP</p>
                 <div className="bg-gradient-to-br from-yellow-400 to-yellow-600 h-32 rounded-t-xl mt-2" />
@@ -565,21 +746,19 @@ const Leaderboard = () => {
             )}
 
             {/* Rank 3 */}
-            {filteredLeaderboard[2] && (
+            {top3[2] && (
               <div className="flex-1 text-center">
                 <div className="relative mb-2">
                   <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center mx-auto border-4 border-white dark:border-gray-800 shadow-lg">
-                    {filteredLeaderboard[2].avatar_url ? (
+                    {top3[2].avatar_url ? (
                       <img
-                        src={filteredLeaderboard[2].avatar_url}
-                        alt={filteredLeaderboard[2].username}
+                        src={top3[2].avatar_url}
+                        alt={top3[2].username}
                         className="w-full h-full rounded-full object-cover"
                       />
                     ) : (
                       <span className="text-white font-bold text-xl">
-                        {filteredLeaderboard[2].username
-                          .charAt(0)
-                          .toUpperCase()}
+                        {top3[2].username.charAt(0).toUpperCase()}
                       </span>
                     )}
                   </div>
@@ -588,10 +767,10 @@ const Leaderboard = () => {
                   </div>
                 </div>
                 <p className="font-bold text-foreground text-sm truncate">
-                  {filteredLeaderboard[2].username}
+                  {top3[2].username}
                 </p>
                 <p className="text-lg font-black text-purple-600">
-                  {filteredLeaderboard[2].points}
+                  {top3[2].points}
                 </p>
                 <p className="text-xs text-muted-foreground">XP</p>
                 <div className="bg-gradient-to-br from-orange-400 to-orange-600 h-20 rounded-t-xl mt-2" />
@@ -610,6 +789,9 @@ const Leaderboard = () => {
           {filteredLeaderboard.slice(3).map((entry) => (
             <div
               key={entry.user_id}
+              ref={
+                entry.user_id === currentUser?.user_id ? currentUserRef : null
+              }
               className={`bg-card/80 backdrop-blur-sm p-4 rounded-xl shadow-sm border border-border/50 hover:shadow-md transition-all ${
                 entry.user_id === currentUser?.user_id
                   ? "ring-2 ring-purple-500"
