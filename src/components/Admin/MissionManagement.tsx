@@ -445,7 +445,7 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
               resetForm();
               setIsDialogOpen(true);
             }}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 hover:bg-primary/90 hover:text-white"
           >
             <Plus className="w-4 h-4" />
             Tambah Misi

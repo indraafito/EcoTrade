@@ -335,7 +335,7 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
             resetForm();
             setIsDialogOpen(true);
           }}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 hover:bg-primary/90 hover:text-white"
         >
           <Plus className="w-4 h-4" />
           Tambah Tier
@@ -362,6 +362,7 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
                     resetForm();
                     setIsDialogOpen(true);
                   }}
+                  className="hover:bg-primary/90 hover:text-white"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Tambah Tier Pertama
@@ -402,6 +403,7 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
                         size="sm"
                         onClick={() => moveTier(tier.id, 'up')}
                         disabled={index === 0}
+                        className="hover:bg-primary/10 hover:text-primary hover:border-primary/20 disabled:opacity-50"
                       >
                         <ArrowUp className="w-4 h-4" />
                       </Button>
@@ -410,6 +412,7 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
                         size="sm"
                         onClick={() => moveTier(tier.id, 'down')}
                         disabled={index === rankingTiers.length - 1}
+                        className="hover:bg-primary/10 hover:text-primary hover:border-primary/20 disabled:opacity-50"
                       >
                         <ArrowDown className="w-4 h-4" />
                       </Button>
@@ -421,6 +424,7 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
                         variant="outline"
                         size="sm"
                         onClick={() => handleEdit(tier)}
+                        className="hover:bg-primary/10 hover:text-primary hover:border-primary/20"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -428,7 +432,7 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
                         variant="outline"
                         size="sm"
                         onClick={() => handleDelete(tier.id)}
-                        className="text-destructive hover:text-destructive"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -562,6 +566,7 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
                 type="button"
                 variant="outline"
                 onClick={() => setIsDialogOpen(false)}
+                className="hover:bg-primary/10 hover:text-primary hover:border-primary/20"
               >
                 Batal
               </Button>
