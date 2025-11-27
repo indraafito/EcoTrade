@@ -276,11 +276,11 @@ const AdminDashboard = () => {
 
   return (
     <AdminProtectedRoute>
-      <div className="min-h-screen bg-background">
-        <div className="bg-primary p-4 rounded-b-3xl shadow-eco mb-4">
+      <div className="bg-background">
+        <div className="bg-primary p-3 rounded-b-3xl shadow-eco mb-2">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white mb-2">Admin Dashboard</h1>
+            <h1 className="text-2xl font-bold text-white mb-1">Admin Dashboard</h1>
             <p className="text-white/90">EcoTrade Management</p>
           </div>
           <Button
