@@ -19,7 +19,6 @@ import AIAnalytics from "@/components/Admin/AIAnalytics";
 import { Badge } from "@/components/ui/badge";
 import { getRegistrationYAxisLabels, getBottleYAxisLabels, formatDate, ChartData } from "@/components/Admin/ChartUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import AdminProtectedRoute from "@/components/Admin/AdminProtectedRoute";
 
 interface Stats {
   totalBottles: number;
@@ -275,12 +274,11 @@ const AdminDashboard = () => {
   }
 
   return (
-    <AdminProtectedRoute>
-      <div className="bg-background">
-        <div className="bg-primary p-3 rounded-b-3xl shadow-eco mb-2">
+    <div className="min-h-screen bg-background">
+      <div className="bg-primary p-6 rounded-b-3xl shadow-eco mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white mb-1">Admin Dashboard</h1>
+            <h1 className="text-2xl font-bold text-white mb-2">Admin Dashboard</h1>
             <p className="text-white/90">EcoTrade Management</p>
           </div>
           <Button
@@ -294,10 +292,9 @@ const AdminDashboard = () => {
           </Button>
         </div>
       </div>
-      </div>
 
-      <div className="px-4 pb-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div className="px-6 pb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex justify-between items-center">
@@ -591,7 +588,7 @@ const AdminDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </AdminProtectedRoute>
+    </div>
   );
 };
 
