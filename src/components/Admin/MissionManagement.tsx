@@ -459,26 +459,25 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
           <p className="mt-2 text-muted-foreground">Memuat data misi...</p>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {missions.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <Target className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Belum Ada Misi</h3>
-                <p className="text-muted-foreground mb-4">
-                  Mulai dengan menambahkan misi pertama untuk pengguna
-                </p>
-                <Button 
-                  onClick={() => {
-                    resetForm();
-                    setIsDialogOpen(true);
-                  }}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Tambah Misi Pertama
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="col-span-full text-center py-12 border-2 border-dashed rounded-lg">
+              <Target className="mx-auto h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-2 text-sm font-medium">Belum ada misi</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Mulai dengan menambahkan misi baru
+              </p>
+              <Button 
+                className="mt-4 hover:bg-primary/90 hover:text-white" 
+                onClick={() => {
+                  resetForm();
+                  setIsDialogOpen(true);
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Tambah Misi
+              </Button>
+            </div>
           ) : (
             missions.map((mission) => (
               <Card key={mission.id} className={`hover:shadow-lg hover:border-primary/20 transition-all duration-200 ${!mission.is_active ? 'opacity-60' : ''}`}>
