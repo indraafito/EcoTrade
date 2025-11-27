@@ -252,9 +252,17 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
       resetForm();
       fetchMissions();
       onMissionChange?.();
-    } catch (error) {
-      console.error('Error saving mission:', error);
-      toast.error('Gagal menyimpan misi');
+    } catch (error: any) {
+      console.error('❌ Error saving mission:', {
+        error: error,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        missionData: missionData,
+        isEditing: !!editingMission
+      });
+      toast.error('Gagal menyimpan misi: ' + (error.message || 'Unknown error'));
     }
   };
 

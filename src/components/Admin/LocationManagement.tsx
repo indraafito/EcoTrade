@@ -339,6 +339,14 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
       resetForm();
       fetchLocations();
     } catch (error: any) {
+      console.error('❌ Error saving location:', {
+        error: error,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        formData: formData
+      });
       toast.error('Gagal menyimpan lokasi: ' + error.message);
     } finally {
       setIsSubmitting(false);

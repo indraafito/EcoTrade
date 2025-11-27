@@ -167,6 +167,14 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
       toast.success('Voucher berhasil dihapus');
       fetchVouchers();
     } catch (error: any) {
+      console.error('❌ Error deleting voucher:', {
+        error: error,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        voucherId: id
+      });
       toast.error('Gagal menghapus voucher: ' + error.message);
     }
   };
@@ -183,6 +191,16 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
       toast.success(`Voucher berhasil ${!voucher.is_active ? 'diaktifkan' : 'dinonaktifkan'}`);
       fetchVouchers();
     } catch (error: any) {
+      console.error('❌ Error toggling voucher status:', {
+        error: error,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        voucherId: voucher.id,
+        currentStatus: voucher.is_active,
+        newStatus: !voucher.is_active
+      });
       toast.error('Gagal memperbarui status voucher: ' + error.message);
     }
   };
