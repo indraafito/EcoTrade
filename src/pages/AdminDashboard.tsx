@@ -9,15 +9,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Gift, MapPin, Users, Recycle, LogOut, Activity, Calendar, Target, Trophy, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
-import LocationManagement from "@/components/Admin/LocationManagement";
-import VoucherManagement from "@/components/Admin/VoucherManagement";
-import MissionManagement from "@/components/Admin/MissionManagement";
-import RankingTiersManagement from "@/components/Admin/RankingTiersManagement";
-import BottleChart from "@/components/Admin/BottleChart";
-import UserRegistrationChart from "@/components/Admin/UserRegistrationChart";
-import AIAnalytics from "@/components/Admin/AIAnalytics";
+import { 
+  LocationManagement, 
+  VoucherManagement, 
+  MissionManagement, 
+  RankingTiersManagement, 
+  BottleChart, 
+  UserRegistrationChart, 
+  AIAnalytics,
+  getRegistrationYAxisLabels, 
+  getBottleYAxisLabels, 
+  formatDate, 
+  ChartData 
+} from "@/components/Admin";
 import { Badge } from "@/components/ui/badge";
-import { getRegistrationYAxisLabels, getBottleYAxisLabels, formatDate, ChartData } from "@/components/Admin/ChartUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Stats {
