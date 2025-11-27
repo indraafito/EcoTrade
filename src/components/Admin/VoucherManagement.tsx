@@ -280,10 +280,13 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
             Kelola semua voucher yang tersedia untuk ditukar pengguna
           </p>
         </div>
-        <Button onClick={() => {
-          resetForm();
-          setIsDialogOpen(true);
-        }}>
+        <Button 
+          onClick={() => {
+            resetForm();
+            setIsDialogOpen(true);
+          }}
+          className="hover:bg-primary/90 hover:text-white"
+        >
           <Plus className="mr-2 h-4 w-4" />
           Tambah Voucher
         </Button>
@@ -298,7 +301,7 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
               Mulai dengan menambahkan voucher baru
             </p>
             <Button 
-              className="mt-4" 
+              className="mt-4 hover:bg-primary/90 hover:text-white" 
               onClick={() => {
                 resetForm();
                 setIsDialogOpen(true);
@@ -356,6 +359,7 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
                       variant="outline"
                       size="sm"
                       onClick={() => handleEdit(voucher)}
+                      className="hover:bg-primary/10 hover:text-primary hover:border-primary/20"
                     >
                       <Edit className="h-3.5 w-3.5 mr-1.5" />
                       Edit
@@ -364,7 +368,7 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
                       variant="outline"
                       size="sm"
                       onClick={() => toggleStatus(voucher)}
-                      className={voucher.is_active ? 'text-destructive' : 'text-green-600'}
+                      className={`${voucher.is_active ? 'text-destructive hover:bg-destructive/10' : 'text-green-600 hover:bg-green-50'} hover:border-current/20`}
                     >
                       {voucher.is_active ? (
                         <>
@@ -382,7 +386,7 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-destructive hover:text-destructive/90"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => handleDelete(voucher.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -549,6 +553,7 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
                   resetForm();
                 }}
                 disabled={isSubmitting}
+                className="hover:bg-primary/10 hover:text-primary hover:border-primary/20"
               >
                 Batal
               </Button>
