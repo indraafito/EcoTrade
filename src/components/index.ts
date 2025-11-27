@@ -1,11 +1,11 @@
 // Layout Components
 export { default as BottomNav } from './Layout/BottomNav';
-export { default as DarkMode } from './Layout/DarkMode';
+export { DarkModeProvider, useDarkMode } from './Layout/DarkMode';
 export { default as ThemeToggle } from './Layout/ThemeToggle';
 
 // Common Components
 export { default as Loading } from './Common/Loading';
-export { default as NavLink } from './Common/NavLink';
+export { NavLink } from './Common/NavLink';
 
 // Auth Components
 export { default as PasswordManagement } from './Auth/PasswordManagement';
@@ -17,4 +17,6 @@ export * from './Admin';
 export * from './ui';
 
 // Redirect Components
-export * from './Redirect';
+export { default as AuthRedirect } from './Redirect/AuthRedirect';
+export { default as ForgotPasswordRedirect } from './Redirect/ForgotPasswordRedirect';
+export { default as OnboardingRedirect } from './Redirect/OnboardingRedirect';

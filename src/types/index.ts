@@ -1,3 +1,3 @@
 /// <reference types="vite/client" />
 
-export * from './vite-env';
+export * from './vite-env.d';
