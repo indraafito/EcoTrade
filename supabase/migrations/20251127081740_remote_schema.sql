@@ -1,3 +1,6 @@
+
+
+
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
@@ -1886,3 +1889,232 @@ drop extension if exists "pg_net";
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 CREATE TRIGGER on_auth_user_created_set_provider AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_oauth_signup();
+
+-- Fix RLS policies for missions table
+-- Allow admin users to perform all CRUD operations on missions
+
+-- Drop existing policy if it exists
+DROP POLICY IF EXISTS "Anyone can view active missions" ON "public"."missions";
+
+-- Create comprehensive policies for missions table
+
+-- 1. Anyone can view active missions (for regular users)
+CREATE POLICY "Anyone can view active missions" ON "public"."missions" 
+FOR SELECT USING (is_active = true);
+
+-- 2. Admin users can view all missions (including inactive ones)
+CREATE POLICY "Admin can view all missions" ON "public"."missions" 
+FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- 3. Admin users can insert missions
+CREATE POLICY "Admin can insert missions" ON "public"."missions" 
+FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- 4. Admin users can update missions
+CREATE POLICY "Admin can update missions" ON "public"."missions" 
+FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- 5. Admin users can delete missions
+CREATE POLICY "Admin can delete missions" ON "public"."missions" 
+FOR DELETE USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- Fix RLS policies for ranking_tiers table
+-- Allow admin users to perform all CRUD operations on ranking_tiers
+
+-- Drop existing policy if it exists
+DROP POLICY IF EXISTS "Anyone can view active ranking tiers" ON "public"."ranking_tiers";
+
+-- Create comprehensive policies for ranking_tiers table
+
+-- 1. Anyone can view active ranking tiers (for regular users)
+CREATE POLICY "Anyone can view active ranking tiers" ON "public"."ranking_tiers" 
+FOR SELECT USING (is_active = true);
+
+-- 2. Admin users can view all ranking tiers (including inactive ones)
+CREATE POLICY "Admin can view all ranking tiers" ON "public"."ranking_tiers" 
+FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- 3. Admin users can insert ranking tiers
+CREATE POLICY "Admin can insert ranking tiers" ON "public"."ranking_tiers" 
+FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- 4. Admin users can update ranking tiers
+CREATE POLICY "Admin can update ranking tiers" ON "public"."ranking_tiers" 
+FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- 5. Admin users can delete ranking tiers
+CREATE POLICY "Admin can delete ranking tiers" ON "public"."ranking_tiers" 
+FOR DELETE USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- Fix RLS policies for locations table
+-- Allow admin users to perform all CRUD operations on locations
+
+-- Drop existing policy if it exists
+DROP POLICY IF EXISTS "Anyone can view active locations" ON "public"."locations";
+
+-- Create comprehensive policies for locations table
+
+-- 1. Anyone can view active locations (for regular users)
+CREATE POLICY "Anyone can view active locations" ON "public"."locations" 
+FOR SELECT USING (is_active = true);
+
+-- 2. Admin users can view all locations (including inactive ones)
+CREATE POLICY "Admin can view all locations" ON "public"."locations" 
+FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- 3. Admin users can insert locations
+CREATE POLICY "Admin can insert locations" ON "public"."locations" 
+FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- 4. Admin users can update locations
+CREATE POLICY "Admin can update locations" ON "public"."locations" 
+FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- 5. Admin users can delete locations
+CREATE POLICY "Admin can delete locations" ON "public"."locations" 
+FOR DELETE USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- Fix RLS policies for vouchers table
+-- Allow admin users to perform all CRUD operations on vouchers
+
+-- Drop existing policy if it exists
+DROP POLICY IF EXISTS "Anyone can view active vouchers" ON "public"."vouchers";
+
+-- Create comprehensive policies for vouchers table
+
+-- 1. Anyone can view active vouchers (for regular users)
+CREATE POLICY "Anyone can view active vouchers" ON "public"."vouchers" 
+FOR SELECT USING (is_active = true);
+
+-- 2. Admin users can view all vouchers (including inactive ones)
+CREATE POLICY "Admin can view all vouchers" ON "public"."vouchers" 
+FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- 3. Admin users can insert vouchers
+CREATE POLICY "Admin can insert vouchers" ON "public"."vouchers" 
+FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- 4. Admin users can update vouchers
+CREATE POLICY "Admin can update vouchers" ON "public"."vouchers" 
+FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
+
+-- 5. Admin users can delete vouchers
+CREATE POLICY "Admin can delete vouchers" ON "public"."vouchers" 
+FOR DELETE USING (
+  EXISTS (
+    SELECT 1 FROM public.user_roles ur 
+    WHERE ur.user_id = auth.uid() 
+    AND ur.role = 'admin'
+  )
+);
