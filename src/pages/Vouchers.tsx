@@ -10,6 +10,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Gift, Tag, UtensilsCrossed, Smartphone, ShoppingBag, Wallet, Trophy, Award } from "lucide-react";
 import { toast } from "sonner";
 
