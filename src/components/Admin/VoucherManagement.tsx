@@ -71,16 +71,31 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
   }, []);
 
   const fetchVouchers = async () => {
+    console.log('📥 Fetching vouchers from database...');
+    
     try {
       const { data, error } = await supabase
         .from("vouchers")
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      console.log('📊 Vouchers response:', { 
+        data: data, 
+        error: error,
+        count: data?.length || 0,
+        timestamp: new Date().toISOString()
+      });
+
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
+      
       setVouchers(data || []);
+      console.log('✅ Vouchers loaded successfully:', data?.length || 0, 'items');
       if (onVoucherChange) onVoucherChange();
     } catch (error: any) {
+      console.error('❌ Error fetching vouchers:', error);
       toast.error("Gagal memuat data voucher: " + error.message);
     } finally {
       setIsLoading(false);
