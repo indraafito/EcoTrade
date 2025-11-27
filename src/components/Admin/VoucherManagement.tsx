@@ -30,7 +30,6 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import AdminPageWrapper from './AdminPageWrapper';
 
 interface Voucher {
   id: string;
@@ -282,7 +281,7 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
           vouchers.map((voucher) => (
             <Card 
               key={voucher.id} 
-              className={`hover:shadow-lg hover:border-primary/20 transition-all duration-200 ${
+              className={`hover:shadow-md transition-shadow ${
                 !voucher.is_active ? 'opacity-70' : ''
               }`}
             >
@@ -334,7 +333,7 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
                       variant="outline"
                       size="sm"
                       onClick={() => toggleStatus(voucher)}
-                      className={voucher.is_active ? 'text-destructive hover:bg-destructive/10 hover:text-destructive' : 'text-success hover:bg-success/10 hover:text-success'}
+                      className={voucher.is_active ? 'text-destructive' : 'text-green-600'}
                     >
                       {voucher.is_active ? (
                         <>
@@ -352,7 +351,7 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    className="text-destructive hover:text-destructive/90"
                     onClick={() => handleDelete(voucher.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -538,13 +537,5 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
   );
 };
 
-const VoucherManagementWithAuth = ({ onVoucherChange }: VoucherManagementProps) => {
-  return (
-    <AdminPageWrapper>
-      <VoucherManagement onVoucherChange={onVoucherChange} />
-    </AdminPageWrapper>
-  );
-};
-
-export default VoucherManagementWithAuth;
+export default VoucherManagement;
 
