@@ -27,7 +27,6 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import AdminPageWrapper from './AdminPageWrapper';
 import { generateLocationQRCodeAPI, saveLocationQRCode } from "@/lib/qr-generator";
 
 interface Location {
@@ -666,12 +665,4 @@ const LocationManagement = ({ onLocationChange }: LocationManagementProps) => {
   );
 };
 
-const LocationManagementWithAuth = ({ onLocationChange }: LocationManagementProps) => {
-  return (
-    <AdminPageWrapper>
-      <LocationManagement onLocationChange={onLocationChange} />
-    </AdminPageWrapper>
-  );
-};
-
-export default LocationManagementWithAuth;
+export default LocationManagement;
