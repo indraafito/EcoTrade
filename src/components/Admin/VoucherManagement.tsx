@@ -281,7 +281,7 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
           vouchers.map((voucher) => (
             <Card 
               key={voucher.id} 
-              className={`hover:shadow-md transition-shadow ${
+              className={`hover:shadow-lg hover:border-primary/20 transition-all duration-200 ${
                 !voucher.is_active ? 'opacity-70' : ''
               }`}
             >
@@ -333,7 +333,7 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
                       variant="outline"
                       size="sm"
                       onClick={() => toggleStatus(voucher)}
-                      className={voucher.is_active ? 'text-destructive' : 'text-green-600'}
+                      className={voucher.is_active ? 'text-destructive hover:bg-destructive/10 hover:text-destructive' : 'text-success hover:bg-success/10 hover:text-success'}
                     >
                       {voucher.is_active ? (
                         <>
@@ -351,7 +351,7 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-destructive hover:text-destructive/90"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => handleDelete(voucher.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />

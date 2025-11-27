@@ -307,7 +307,7 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
             rankingTiers.map((tier, index) => (
               <Card 
                 key={tier.id} 
-                className={`${getTierColor(tier.sort_order)} border-2 ${!tier.is_active ? 'opacity-60' : ''}`}
+                className={`${getTierColor(tier.sort_order)} border-2 hover:shadow-lg hover:border-primary/20 transition-all duration-200 ${!tier.is_active ? 'opacity-60' : ''}`}
               >
                 <CardHeader>
                   <div className="flex items-start justify-between">
@@ -363,7 +363,7 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
                         variant="outline"
                         size="sm"
                         onClick={() => handleDelete(tier.id)}
-                        className="text-destructive hover:text-destructive"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
