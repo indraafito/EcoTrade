@@ -32,6 +32,7 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import AdminPageWrapper from './AdminPageWrapper';
 
 interface RankingTier {
   id: string;
@@ -511,4 +512,12 @@ const RankingTiersManagement = ({ onRankingTiersChange }: RankingTiersManagement
   );
 };
 
-export default RankingTiersManagement;
+const RankingTiersManagementWithAuth = ({ onRankingTiersChange }: RankingTiersManagementProps) => {
+  return (
+    <AdminPageWrapper>
+      <RankingTiersManagement onRankingTiersChange={onRankingTiersChange} />
+    </AdminPageWrapper>
+  );
+};
+
+export default RankingTiersManagementWithAuth;

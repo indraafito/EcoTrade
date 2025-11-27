@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import AdminPageWrapper from './AdminPageWrapper';
 
 interface Mission {
   id: string;
@@ -905,4 +906,12 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
   );
 };
 
-export default MissionManagement;
+const MissionManagementWithAuth = ({ onMissionChange }: MissionManagementProps) => {
+  return (
+    <AdminPageWrapper>
+      <MissionManagement onMissionChange={onMissionChange} />
+    </AdminPageWrapper>
+  );
+};
+
+export default MissionManagementWithAuth;

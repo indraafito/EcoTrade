@@ -986,7 +986,6 @@ const simulateQRScan = async () => {
                     playsInline
                     muted
                     className="w-full h-64 object-cover rounded-2xl bg-black shadow-lg"
-                    style={{ transform: 'scaleX(-1)' }}
                   />
                   {/* Hidden canvas for QR processing */}
                   <canvas

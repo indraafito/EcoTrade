@@ -30,6 +30,7 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import AdminPageWrapper from './AdminPageWrapper';
 
 interface Voucher {
   id: string;
@@ -537,5 +538,13 @@ const VoucherManagement = ({ onVoucherChange }: VoucherManagementProps) => {
   );
 };
 
-export default VoucherManagement;
+const VoucherManagementWithAuth = ({ onVoucherChange }: VoucherManagementProps) => {
+  return (
+    <AdminPageWrapper>
+      <VoucherManagement onVoucherChange={onVoucherChange} />
+    </AdminPageWrapper>
+  );
+};
+
+export default VoucherManagementWithAuth;
 

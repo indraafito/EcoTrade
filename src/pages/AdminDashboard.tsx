@@ -19,6 +19,7 @@ import AIAnalytics from "@/components/Admin/AIAnalytics";
 import { Badge } from "@/components/ui/badge";
 import { getRegistrationYAxisLabels, getBottleYAxisLabels, formatDate, ChartData } from "@/components/Admin/ChartUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import AdminProtectedRoute from "@/components/Admin/AdminProtectedRoute";
 
 interface Stats {
   totalBottles: number;
@@ -274,7 +275,8 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <AdminProtectedRoute>
+      <div className="min-h-screen bg-background">
       <div className="bg-primary p-6 rounded-b-3xl shadow-eco mb-6">
         <div className="flex items-center justify-between">
           <div>
@@ -588,7 +590,7 @@ const AdminDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </AdminProtectedRoute>
   );
 };
 
