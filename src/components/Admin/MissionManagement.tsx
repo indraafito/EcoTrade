@@ -211,23 +211,24 @@ const MissionManagement = ({ onMissionChange }: MissionManagementProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    const missionData = {
+      title: formData.title,
+      description: formData.description,
+      target_type: formData.target_type,
+      target_value: formData.target_value,
+      points_bonus: formData.points_bonus,
+      mission_type: formData.mission_type,
+      difficulty: formData.difficulty,
+      duration_hours: formData.duration_hours,
+      icon: formData.icon || null,
+      start_date: formData.start_date || null,
+      end_date: formData.end_date || null,
+      is_active: formData.is_active,
+      max_completions: formData.max_completions,
+      city: formData.city || null
+    };
+    
     try {
-      const missionData = {
-        title: formData.title,
-        description: formData.description,
-        target_type: formData.target_type,
-        target_value: formData.target_value,
-        points_bonus: formData.points_bonus,
-        mission_type: formData.mission_type,
-        difficulty: formData.difficulty,
-        duration_hours: formData.duration_hours,
-        icon: formData.icon || null,
-        start_date: formData.start_date || null,
-        end_date: formData.end_date || null,
-        is_active: formData.is_active,
-        max_completions: formData.max_completions,
-        city: formData.city || null
-      };
 
       if (editingMission) {
         // Update existing mission

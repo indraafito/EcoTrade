@@ -15,17 +15,15 @@ import {
   DialogTitle 
 } from "@/components/ui/dialog";
 import { 
-  Gift, 
+  Gift as GiftIcon, 
   Plus, 
   Edit, 
   Trash2, 
   Check, 
   X,
-  Gift as GiftIcon,
   Percent,
   Utensils,
-  CreditCard,
-  GiftOff
+  CreditCard
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
