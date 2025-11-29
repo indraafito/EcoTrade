@@ -41,6 +41,10 @@ import {
   CheckCircle2,
   Copy,
   ShieldAlert,
+  Medal,
+  Crown,
+  Star,
+  Gem,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -98,6 +102,7 @@ const ProfilePage = () => {
   const [isRedemptionsLoading, setIsRedemptionsLoading] = useState(true);
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
   const [isUsernameLoading, setIsUsernameLoading] = useState(false);
+  const [weeklyXP, setWeeklyXP] = useState(0);
   const { isDark, toggleDarkMode } = useDarkMode();
 
   // Password states
@@ -118,7 +123,66 @@ const ProfilePage = () => {
     fetchRedemptions();
     fetchActivities();
     checkUserPasswordStatus();
+    calculateWeeklyXP();
   }, []);
+
+  const calculateWeeklyXP = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Hitung XP minggu ini dari xp_transactions (seperti di Home)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const { data: xpData, error: xpError } = await (supabase as any)
+        .from("xp_transactions")
+        .select("amount")
+        .eq("user_id", user.id)
+        .eq("type", "earn")
+        .gte("created_at", sevenDaysAgo.toISOString());
+
+      if (!xpError && xpData) {
+        const weeklyTotal = xpData.reduce((sum, tx) => sum + tx.amount, 0);
+        setWeeklyXP(weeklyTotal);
+      }
+    } catch (error: any) {
+      console.error("Error calculating weekly XP:", error);
+      setWeeklyXP(0);
+    }
+  };
+
+  // Function to calculate tier based on points
+  const calculateTierFromPoints = (points: number): string => {
+    // Simple tier calculation - bisa disesuaikan dengan logic yang lebih kompleks
+    if (points >= 1000) return "Diamond";
+    if (points >= 500) return "Platinum";
+    if (points >= 250) return "Gold";
+    if (points >= 100) return "Silver";
+    return "Bronze";
+  };
+
+  // Function to get tier icon
+  const getTierIcon = (tierName: string, size: "small" | "large" = "small") => {
+    const sizeClass = size === "large" ? "w-12 h-12" : "w-4 h-4";
+    
+    switch (tierName?.toLowerCase()) {
+      case "bronze":
+        return <Medal className={`${sizeClass} text-orange-600`} />;
+      case "silver":
+        return <Medal className={`${sizeClass} text-gray-500`} />;
+      case "gold":
+        return <Crown className={`${sizeClass} text-yellow-500`} />;
+      case "platinum":
+        return <Star className={`${sizeClass} text-cyan-500`} />;
+      case "diamond":
+        return <Gem className={`${sizeClass} text-blue-500`} />;
+      default:
+        return <Award className={`${sizeClass} text-primary`} />;
+    }
+  };
 
   const checkUserPasswordStatus = async () => {
     try {
@@ -468,15 +532,7 @@ const ProfilePage = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#1DBF73]/5 via-background to-primary/5 pb-28">
-        <div className="px-6 pt-12">
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          </div>
-        </div>
-      </div>
-    );
+    return <Loading />;
   }
 
   return (
@@ -505,25 +561,40 @@ const ProfilePage = () => {
       </div>
 
       {/* ================= FLOATING POINT CARD ================= */}
-      <div className="-mt-20 px-6">
+      <div className="-mt-20 px-6 relative z-20">
         <div className="bg-card/90 backdrop-blur-xl rounded-3xl shadow-2xl p-6 border border-green-200 dark:border-green-800 relative overflow-hidden">
-
           <div className="relative z-10">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Trophy className="w-4 h-4 text-green-600" />
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Total Poin
+            <div className="flex justify-between items-start">
+              {/* Poin Permanen */}
+              <div className="flex-1">
+                <p className="text-gray-500 text-sm font-medium mb-1">
+                  Total Poin Anda
+                </p>
+                <p className="text-5xl font-black text-green-600 mb-2 tracking-tight">
+                  {profile?.points?.toLocaleString() || 0}
+                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-green-600 text-sm font-semibold">
+                    +{weeklyXP} poin minggu ini
                   </p>
                 </div>
-                <p className="text-5xl font-black text-green-600 tracking-tight">
-                  {profile?.points || 0}
+              </div>
+
+              {/* XP Badge */}
+              <button
+                onClick={() => navigate("/leaderboard")}
+                className="flex flex-col items-center gap-2 hover:scale-105 transition-transform"
+              >
+                <div className="w-20 h-20 rounded-3xl bg-card/90 flex items-center justify-center shadow-md">
+                  {profile && getTierIcon(calculateTierFromPoints(profile.points), "large")}
+                </div>
+                <p className="text-green-600 text-sm font-bold">
+                  XP {profile?.points?.toLocaleString() || 0}
                 </p>
-              </div>
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-[#1DBF73] flex items-center justify-center shadow-lg">
-                <Award className="w-9 h-9 text-white" />
-              </div>
+                <p className="text-green-600 text-xs underline hover:text-green-700 transition-colors">
+                  Lihat Leaderboard
+                </p>
+              </button>
             </div>
           </div>
         </div>

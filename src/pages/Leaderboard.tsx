@@ -77,17 +77,54 @@ const Leaderboard = () => {
   const [showPastWinners, setShowPastWinners] = useState(false);
   const [showRankingTiers, setShowRankingTiers] = useState(false);
   const [achievedBadges, setAchievedBadges] = useState<AchievedBadge[]>([]);
-  const [daysUntilReset, setDaysUntilReset] = useState<number>(0);
+  const [timeUntilReset, setTimeUntilReset] = useState<string>("");
 
   // Ref untuk scroll ke posisi user
   const currentUserRef = useRef<HTMLDivElement>(null);
 
-  // Calculate days until reset
-  const calculateDaysUntilReset = () => {
+  // Calculate time until reset with detailed format
+  const calculateTimeUntilReset = () => {
     const now = new Date();
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const daysLeft = Math.ceil((endOfMonth.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    return daysLeft;
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const timeDiff = endOfMonth.getTime() - now.getTime();
+    
+    if (timeDiff <= 0) return "Reset sekarang";
+    
+    const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+    
+    const parts = [];
+    if (days > 0) parts.push(`${days} hari`);
+    if (hours > 0) parts.push(`${hours} jam`);
+    if (minutes > 0) parts.push(`${minutes} menit`);
+    if (seconds > 0) parts.push(`${seconds} detik`);
+    
+    return parts.length > 0 ? parts.join(" ") + " lagi" : "Reset sekarang";
+  };
+
+  // Check if reset should happen and refresh data
+  const checkAndHandleReset = async () => {
+    const now = new Date();
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const timeDiff = endOfMonth.getTime() - now.getTime();
+    
+    // If time is up or passed, refresh all data
+    if (timeDiff <= 0) {
+      console.log("Reset time reached! Refreshing leaderboard data...");
+      setIsLoading(true); // Show loading state
+      
+      await fetchLeaderboard();
+      await fetchRankingTiers();
+      await fetchPastWinners();
+      await fetchAchievedBadges();
+      
+      setIsLoading(false);
+      
+      // Show notification
+      toast.success("🎉 Leaderboard telah di-reset! Kompetisi bulan baru dimulai!");
+    }
   };
 
   useEffect(() => {
@@ -95,7 +132,17 @@ const Leaderboard = () => {
     fetchRankingTiers();
     fetchPastWinners();
     fetchAchievedBadges();
-    setDaysUntilReset(calculateDaysUntilReset());
+    setTimeUntilReset(calculateTimeUntilReset());
+  }, []);
+
+  // Update countdown every second and check for reset
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeUntilReset(calculateTimeUntilReset());
+      checkAndHandleReset(); // Check if reset should happen
+    }, 1000); // Update every second
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -465,8 +512,12 @@ const Leaderboard = () => {
             </p>
             <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20">
               <Clock className="w-4 h-4 text-white/80" />
-              <p className="text-white text-sm font-semibold">
-                {daysUntilReset} hari lagi
+              <p className={`text-sm font-semibold ${
+                timeUntilReset === "Reset sekarang" 
+                  ? "text-yellow-300 animate-pulse" 
+                  : "text-white"
+              }`}>
+                {timeUntilReset}
               </p>
             </div>
           </div>
