@@ -630,8 +630,8 @@ const Home = () => {
                 <p className="text-green-600 text-sm font-bold">
                   XP {profile?.xp?.toLocaleString() || 0}
                 </p>
-                <p className="text-green-600 text-xs">
-                  Ranking #{monthlyRank || '-'}
+                <p className="text-green-600 text-xs underline hover:text-green-700 transition-colors">
+                  Lihat Leaderboard
                 </p>
               </button>
             </div>

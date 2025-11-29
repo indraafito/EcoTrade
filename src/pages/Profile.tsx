@@ -506,19 +506,18 @@ const ProfilePage = () => {
 
       {/* ================= FLOATING POINT CARD ================= */}
       <div className="-mt-20 px-6">
-        <div className="bg-card/80 backdrop-blur-xl rounded-3xl shadow-2xl p-6 border border-white/20 dark:border-white/10 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
+        <div className="bg-card/90 backdrop-blur-xl rounded-3xl shadow-2xl p-6 border border-green-200 dark:border-green-800 relative overflow-hidden">
 
           <div className="relative z-10">
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <Trophy className="w-4 h-4 text-primary" />
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <Trophy className="w-4 h-4 text-green-600" />
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     Total Poin
                   </p>
                 </div>
-                <p className="text-5xl font-black text-primary tracking-tight">
+                <p className="text-5xl font-black text-green-600 tracking-tight">
                   {profile?.points || 0}
                 </p>
               </div>
