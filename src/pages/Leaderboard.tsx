@@ -306,6 +306,59 @@ const Leaderboard = () => {
     }
   };
 
+  // Function to calculate tier based on points
+  const calculateTierFromPoints = (points: number): string => {
+    // Sort ranking tiers by threshold (highest first)
+    const sortedTiers = [...rankingTiers].sort((a, b) => b.threshold_points - a.threshold_points);
+    
+    for (const tier of sortedTiers) {
+      if (points >= tier.threshold_points) {
+        return tier.name;
+      }
+    }
+    
+    return "Bronze"; // Default tier
+  };
+
+  // Enhanced getTierBadgeColor that calculates tier if rank_name is empty
+  const getTierBadgeColorWithPoints = (rankName: string | null, points: number) => {
+    const tierName = rankName || calculateTierFromPoints(points);
+    return getTierBadgeColor(tierName);
+  };
+
+  // Enhanced tier name display that calculates tier if rank_name is empty
+  const getTierNameWithPoints = (rankName: string | null, points: number) => {
+    return rankName || calculateTierFromPoints(points);
+  };
+
+  // Function to get next tier and points needed
+  const getNextTierProgress = (points: number) => {
+    // Sort ranking tiers by threshold (ascending)
+    const sortedTiers = [...rankingTiers].sort((a, b) => a.threshold_points - b.threshold_points);
+    
+    // Find current tier
+    const currentTier = calculateTierFromPoints(points);
+    
+    // Find next tier
+    const currentTierIndex = sortedTiers.findIndex(tier => tier.name === currentTier);
+    const nextTier = sortedTiers[currentTierIndex + 1];
+    
+    if (nextTier) {
+      const pointsNeeded = nextTier.threshold_points - points;
+      return {
+        nextTier: nextTier.name,
+        pointsNeeded: pointsNeeded > 0 ? pointsNeeded : 0,
+        hasProgress: pointsNeeded > 0
+      };
+    }
+    
+    return {
+      nextTier: null,
+      pointsNeeded: 0,
+      hasProgress: false
+    };
+  };
+
   const getTierDescription = (tier: RankingTier) => {
     const { name } = tier;
     let description = "";
@@ -490,12 +543,6 @@ const Leaderboard = () => {
                         </span>
                       )}
                     </div>
-                    {/* Position indicator badge */}
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800">
-                      <span className="text-white text-xs font-bold">
-                        {currentUser.position <= 3 ? ["🥇","🥈","🥉"][currentUser.position - 1] : currentUser.position}
-                      </span>
-                    </div>
                   </div>
                   <div>
                     <p className="font-bold text-foreground text-lg">
@@ -505,15 +552,14 @@ const Leaderboard = () => {
                       {currentUser.full_name}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
-                      {currentUser.rank_name && (
-                        <span
-                          className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border ${getTierBadgeColor(
-                            currentUser.rank_name
-                          )}`}
-                        >
-                          {currentUser.rank_name}
-                        </span>
-                      )}
+                      <span
+                        className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border ${getTierBadgeColorWithPoints(
+                          currentUser.rank_name,
+                          currentUser.points
+                        )}`}
+                      >
+                        {getTierNameWithPoints(currentUser.rank_name, currentUser.points)}
+                      </span>
                       <span className="text-xs text-muted-foreground">
                         {currentUser.city || "Lokasi tidak diketahui"}
                       </span>
@@ -545,18 +591,37 @@ const Leaderboard = () => {
                 </div>
               )}
               
-              {/* Reset Countdown */}
-              <div className="mt-4 pt-4 border-t border-purple-500/20">
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-purple-600" />
-                    <span className="text-muted-foreground">Reset bulanan</span>
-                  </div>
-                  <span className="text-purple-600 font-semibold">
-                    {daysUntilReset} hari lagi
-                  </span>
-                </div>
-              </div>
+              {/* Progress to next tier */}
+              {(() => {
+                const tierProgress = getNextTierProgress(currentUser.points);
+                if (tierProgress.hasProgress && tierProgress.nextTier) {
+                  return (
+                    <div className="mt-4 pt-4 border-t border-purple-500/20">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1">
+                          <Trophy className="w-3 h-3 text-purple-600" />
+                          <span className="text-muted-foreground">Naik ke {tierProgress.nextTier}</span>
+                        </div>
+                        <span className="text-purple-600 font-semibold">
+                          {tierProgress.pointsNeeded.toLocaleString("id-ID")} XP lagi
+                        </span>
+                      </div>
+                    </div>
+                  );
+                } else if (!tierProgress.nextTier) {
+                  return (
+                    <div className="mt-4 pt-4 border-t border-purple-500/20">
+                      <div className="flex items-center justify-center text-xs">
+                        <div className="flex items-center gap-1">
+                          <Crown className="w-3 h-3 text-yellow-500" />
+                          <span className="text-yellow-600 font-semibold">Tier Tertinggi!</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           </div>
         </div>
@@ -906,15 +971,14 @@ const Leaderboard = () => {
                     <p className="font-bold text-foreground text-sm">
                       {entry.username}
                     </p>
-                    {entry.rank_name && (
-                      <span
-                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${getTierBadgeColor(
-                          entry.rank_name
-                        )}`}
-                      >
-                        {entry.rank_name}
-                      </span>
-                    )}
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${getTierBadgeColorWithPoints(
+                        entry.rank_name,
+                        entry.points
+                      )}`}
+                    >
+                      {getTierNameWithPoints(entry.rank_name, entry.points)}
+                    </span>
                   </div>
                 </div>
                 <div className="text-right">

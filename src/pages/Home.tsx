@@ -15,6 +15,10 @@ import {
   Sparkles,
   Zap,
   Calendar,
+  Medal,
+  Crown,
+  Star,
+  Gem,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -70,6 +74,14 @@ interface MissionProgress {
   started_at: string;
 }
 
+interface RankingTier {
+  id: string;
+  name: string;
+  threshold_points: number;
+  bonus_points: number;
+  sort_order: number;
+}
+
 const Home = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -79,6 +91,7 @@ const Home = () => {
   const [weeklyXP, setWeeklyXP] = useState(0);
   const [monthlyRank, setMonthlyRank] = useState<number | null>(null);
   const [claimingMission, setClaimingMission] = useState<string | null>(null);
+  const [rankingTiers, setRankingTiers] = useState<RankingTier[]>([]);
 
   useEffect(() => {
     checkAuth();
@@ -86,6 +99,7 @@ const Home = () => {
     fetchActivities();
     fetchMissions();
     fetchMonthlyRank();
+    fetchRankingTiers();
   }, []);
 
   const checkAuth = async () => {
@@ -239,9 +253,10 @@ const Home = () => {
       } = await supabase.auth.getUser();
       if (!user) return;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("leaderboard_view")
-        .select("user_id, position")
+        .select("position")
         .eq("user_id", user.id)
         .single();
 
@@ -251,6 +266,84 @@ const Home = () => {
     } catch (error: any) {
       console.error("Error fetching rank:", error);
     }
+  };
+
+  const fetchRankingTiers = async () => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("ranking_tiers")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+
+      if (error) throw error;
+      setRankingTiers(data || []);
+    } catch (error: any) {
+      console.error("Error fetching ranking tiers:", error);
+    }
+  };
+
+  // Function to calculate tier based on points
+  const calculateTierFromPoints = (points: number): string => {
+    // Sort ranking tiers by threshold (highest first)
+    const sortedTiers = [...rankingTiers].sort((a, b) => b.threshold_points - a.threshold_points);
+    
+    for (const tier of sortedTiers) {
+      if (points >= tier.threshold_points) {
+        return tier.name;
+      }
+    }
+    
+    return "Bronze"; // Default tier
+  };
+
+  // Function to get tier icon
+  const getTierIcon = (tierName: string, size: "small" | "large" = "small") => {
+    const sizeClass = size === "large" ? "w-12 h-12" : "w-4 h-4";
+    
+    switch (tierName?.toLowerCase()) {
+      case "bronze":
+        return <Medal className={`${sizeClass} text-orange-600`} />;
+      case "silver":
+        return <Medal className={`${sizeClass} text-gray-500`} />;
+      case "gold":
+        return <Crown className={`${sizeClass} text-yellow-500`} />;
+      case "platinum":
+        return <Star className={`${sizeClass} text-cyan-500`} />;
+      case "diamond":
+        return <Gem className={`${sizeClass} text-blue-500`} />;
+      default:
+        return <Award className={`${sizeClass} text-primary`} />;
+    }
+  };
+
+  // Function to get next tier and points needed
+  const getNextTierProgress = (points: number) => {
+    // Sort ranking tiers by threshold (ascending)
+    const sortedTiers = [...rankingTiers].sort((a, b) => a.threshold_points - b.threshold_points);
+    
+    // Find current tier
+    const currentTier = calculateTierFromPoints(points);
+    
+    // Find next tier
+    const currentTierIndex = sortedTiers.findIndex(tier => tier.name === currentTier);
+    const nextTier = sortedTiers[currentTierIndex + 1];
+    
+    if (nextTier) {
+      const pointsNeeded = nextTier.threshold_points - points;
+      return {
+        nextTier: nextTier.name,
+        pointsNeeded: pointsNeeded > 0 ? pointsNeeded : 0,
+        hasProgress: pointsNeeded > 0
+      };
+    }
+    
+    return {
+      nextTier: null,
+      pointsNeeded: 0,
+      hasProgress: false
+    };
   };
 
   const fetchMissions = async () => {
@@ -532,7 +625,7 @@ const Home = () => {
                 className="flex flex-col items-center gap-2 hover:scale-105 transition-transform"
               >
                 <div className="w-20 h-20 rounded-3xl bg-card/90 flex items-center justify-center shadow-md">
-                  <Trophy className="w-9 h-9 text-green-600" />
+                  {profile && getTierIcon(calculateTierFromPoints(profile.xp), "large")}
                 </div>
                 <p className="text-green-600 text-sm font-bold">
                   XP {profile?.xp?.toLocaleString() || 0}
