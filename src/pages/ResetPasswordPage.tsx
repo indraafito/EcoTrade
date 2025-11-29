@@ -81,8 +81,6 @@ const ResetPasswordPage = () => {
       const refreshToken = hashParams.get('refresh_token');
       const type = hashParams.get('type');
       
-      console.log("Hash params:", { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
-      
       // Check if this is a recovery type
       if (type !== 'recovery') {
         // Try to get existing session
@@ -117,7 +115,6 @@ const ResetPasswordPage = () => {
         throw new Error("Session tidak dapat dibuat");
       }
 
-      console.log("Session created successfully");
       setIsValid(true);
       
     } catch (error: any) {
@@ -169,8 +166,6 @@ const ResetPasswordPage = () => {
         throw new Error("Session tidak valid. Silakan minta link reset baru.");
       }
 
-      console.log("Updating password for user:", session.user.id);
-
       // Update password
       const { data, error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
@@ -180,8 +175,6 @@ const ResetPasswordPage = () => {
         console.error("Update error:", updateError);
         throw updateError;
       }
-
-      console.log("Password updated successfully");
 
       // Log password change (optional, may fail if RPC doesn't exist yet)
       try {

@@ -18,37 +18,42 @@ import { DarkModeProvider } from "@/components";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import Missions from "./pages/Missions";
 import Leaderboard from "./pages/Leaderboard";
+import ErrorBoundary from "@/components/Common/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <DarkModeProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Splash />} />
-          <Route path="/onboarding" element={<OnboardingRedirect />} />
-          <Route path="/auth" element={<AuthRedirect />} />
-          <Route path="/forgot-password" element={<ForgotPasswordRedirect />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/location" element={<LocationPage />} />
-          <Route path="/scan" element={<Scan />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/vouchers" element={<Vouchers />} />
-          <Route path="/admin" element={<AdminAuth />} />
-          <Route path="/admin-dashboard" element={<AdminDashboard />} />
-          <Route path="*" element={<NotFound />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/missions" element={<Missions />} />
-          <Route path="/leaderboard" element={<Leaderboard />} />
-       </Routes>
-      </BrowserRouter>
-      </DarkModeProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <DarkModeProvider>
+        <BrowserRouter>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Splash />} />
+              <Route path="/onboarding" element={<OnboardingRedirect />} />
+              <Route path="/auth" element={<AuthRedirect />} />
+              <Route path="/forgot-password" element={<ForgotPasswordRedirect />} />
+              <Route path="/home" element={<Home />} />
+              <Route path="/location" element={<LocationPage />} />
+              <Route path="/scan" element={<Scan />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/vouchers" element={<Vouchers />} />
+              <Route path="/admin" element={<AdminAuth />} />
+              <Route path="/admin-dashboard" element={<AdminDashboard />} />
+              <Route path="*" element={<NotFound />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/missions" element={<Missions />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
+           </Routes>
+          </ErrorBoundary>
+        </BrowserRouter>
+        </DarkModeProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

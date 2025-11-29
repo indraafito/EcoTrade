@@ -2,3 +2,22 @@ node_modules/
 .env
 dist/
 build/
+
+# Test coverage reports
+coverage/
+*.lcov
+
+# Test artifacts
+.nyc_output/
+test-results/
+junit.xml
+
+# Vitest specific
+.vitest/
+
+# Test files (exclude from git)
+**/__tests__/
+*.test.ts
+*.test.tsx
+*.test.js
+*.test.jsx

@@ -126,18 +126,6 @@ const Home = () => {
         total_vouchers: voucherCount || 0,
       } as any;
 
-      console.log('🏠 === HOME PAGE DATA FETCH ===');
-      console.log('📋 Profile Data:', profileData);
-      console.log('🎫 Voucher Count:', voucherCount);
-      console.log('📊 Final Data:', data);
-      console.log('🔍 Points Analysis:');
-      console.log('  - Total Points:', data.points);
-      console.log('  - XP (Total):', data.xp);
-      console.log('  - XP Month:', data.xp_month);
-      console.log('  - XP Year:', data.xp_year);
-      console.log('  - Total Bottles:', data.total_bottles);
-      console.log('  - Total Vouchers:', data.total_vouchers);
-
       if (error) {
         if (error.code === "PGRST116") {
           const { data: newProfile, error: insertError } = await supabase
@@ -176,8 +164,6 @@ const Home = () => {
             total_earnings: 0,
             total_vouchers: 0,
           };
-
-          console.log('📊 Profile with defaults:', profileWithDefaults);
 
           setProfile(profileWithDefaults);
           toast.success("Profil berhasil dibuat!");

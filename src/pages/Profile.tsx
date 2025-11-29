@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useDarkMode } from "@/components";
 import { Barcode } from "lucide-react";
+import { quickRetry } from "@/lib/api-retry";
 import BarcodeDisplay from "react-barcode";
 
 import {
@@ -93,6 +94,8 @@ const ProfilePage = () => {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showUsernameDialog, setShowUsernameDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isActivitiesLoading, setIsActivitiesLoading] = useState(true);
+  const [isRedemptionsLoading, setIsRedemptionsLoading] = useState(true);
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
   const [isUsernameLoading, setIsUsernameLoading] = useState(false);
   const { isDark, toggleDarkMode } = useDarkMode();
@@ -147,14 +150,20 @@ const ProfilePage = () => {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("full_name, username, avatar_url, points, username_last_updated")
-        .eq("user_id", user.id)
-        .single();
+      const result = await quickRetry.fetchOne(
+        async () => {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("full_name, username, avatar_url, points, username_last_updated")
+            .eq("user_id", user.id)
+            .single();
+          return { data, error };
+        },
+        "profile"
+      );
 
-      if (error) throw error;
-      setProfile(data);
+      if (result.error) throw result.error;
+      setProfile(result.data as Profile);
     } catch (error: any) {
       toast.error("Gagal memuat profil");
     } finally {
@@ -163,6 +172,7 @@ const ProfilePage = () => {
   };
 
   const fetchRedemptions = async () => {
+    setIsRedemptionsLoading(true);
     try {
       const {
         data: { user },
@@ -171,8 +181,6 @@ const ProfilePage = () => {
         toast.error("Silakan login kembali");
         return;
       }
-
-      console.log("Mengambil data voucher untuk user:", user.id);
 
       const { data, error } = await supabase
         .from("voucher_redemptions")
@@ -186,11 +194,8 @@ const ProfilePage = () => {
         .order("redeemed_at", { ascending: false });
 
       if (error) {
-        console.error("Error mengambil data voucher:", error);
         throw error;
       }
-
-      console.log("Data voucher yang diterima:", data);
 
       const formattedData = data.map((item) => ({
         id: item.id,
@@ -207,13 +212,15 @@ const ProfilePage = () => {
 
       setRedemptions(formattedData);
     } catch (error) {
-      console.error("Error dalam fetchRedemptions:", error);
       toast.error("Gagal memuat daftar voucher");
       setRedemptions([]);
+    } finally {
+      setIsRedemptionsLoading(false);
     }
   };
 
   const fetchActivities = async () => {
+    setIsActivitiesLoading(true);
     try {
       const {
         data: { user },
@@ -239,6 +246,8 @@ const ProfilePage = () => {
       setActivities(data || []);
     } catch (error: any) {
       toast.error("Gagal memuat riwayat");
+    } finally {
+      setIsActivitiesLoading(false);
     }
   };
 
@@ -327,32 +336,46 @@ const ProfilePage = () => {
       }
       
       // Check if username already exists
-      const { data: existingUser, error: checkError } = await supabase
-        .from("profiles")
-        .select("username")
-        .eq("username", newUsername)
-        .neq("user_id", user.id)
-        .single();
+      const checkResult = await quickRetry.fetchOne(
+        async () => {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("username")
+            .eq("username", newUsername)
+            .neq("user_id", user.id)
+            .single();
+          return { data, error };
+        },
+        "username check"
+      );
       
-      if (checkError && checkError.code !== "PGRST116") {
-        throw checkError;
+      if (checkResult.error && checkResult.error.code !== "PGRST116") {
+        throw checkResult.error;
       }
       
-      if (existingUser) {
+      if (checkResult.data) {
         toast.error("Username sudah digunakan!");
         return;
       }
       
       // Update username with timestamp
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ 
-          username: newUsername,
-          username_last_updated: new Date().toISOString()
-        })
-        .eq("user_id", user.id);
+      const updateResult = await quickRetry.update(
+        async () => {
+          const { data, error } = await supabase
+            .from("profiles")
+            .update({ 
+              username: newUsername,
+              username_last_updated: new Date().toISOString()
+            })
+            .eq("user_id", user.id)
+            .select()
+            .single();
+          return { data, error };
+        },
+        "username"
+      );
       
-      if (updateError) throw updateError;
+      if (updateResult.error) throw updateResult;
       
       toast.success("Username berhasil diubah!");
       
@@ -445,7 +468,15 @@ const ProfilePage = () => {
   };
 
   if (isLoading) {
-    return <Loading />;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#1DBF73]/5 via-background to-primary/5 pb-28">
+        <div className="px-6 pt-12">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -525,7 +556,11 @@ const ProfilePage = () => {
 
           {/* VOUCHERS TAB */}
           <TabsContent value="vouchers" className="space-y-3 mt-4">
-            {redemptions.length === 0 ? (
+            {isRedemptionsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : redemptions.length === 0 ? (
               <div className="bg-card/80 backdrop-blur-sm p-8 rounded-2xl text-center border border-border/50 shadow-sm">
                 <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-3">
                   <Gift className="w-8 h-8 text-muted-foreground/50" />
@@ -648,7 +683,11 @@ const ProfilePage = () => {
 
           {/* HISTORY TAB */}
           <TabsContent value="history" className="space-y-3 mt-4">
-            {activities.length === 0 ? (
+            {isActivitiesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : activities.length === 0 ? (
               <div className="bg-card/80 backdrop-blur-sm p-8 rounded-2xl text-center border border-border/50 shadow-sm">
                 <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-3">
                   <History className="w-8 h-8 text-muted-foreground/50" />
