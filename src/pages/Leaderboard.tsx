@@ -436,57 +436,97 @@ const Leaderboard = () => {
       {/* Current User Card */}
       {currentUser && (
         <div className="px-6 mb-6">
-          <div className="bg-card/90 backdrop-blur-xl rounded-2xl shadow-xl p-5 border border-border/50">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              Posisi Kamu Bulan Ini
-            </p>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
-                    {currentUser.avatar_url ? (
-                      <img
-                        src={currentUser.avatar_url}
-                        alt={currentUser.username}
-                        className="w-full h-full rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-white font-bold text-xl">
-                        {currentUser.username.charAt(0).toUpperCase()}
-                      </span>
-                    )}
+          <div className="bg-gradient-to-r from-purple-500/10 to-purple-600/10 backdrop-blur-xl rounded-2xl shadow-xl p-5 border border-purple-500/30 relative overflow-hidden">
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-2xl" />
+            
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">
+                  🏆 Posisi Kamu Bulan Ini
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="bg-purple-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                    #{currentUser.position}
                   </div>
-                </div>
-                <div>
-                  <p className="font-bold text-foreground text-lg">
-                    {currentUser.username}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {currentUser.full_name}
-                  </p>
-                  {currentUser.rank_name && (
-                    <span
-                      className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 border ${getTierBadgeColor(
-                        currentUser.rank_name
-                      )}`}
-                    ></span>
+                  {currentUser.position <= 10 && (
+                    <div className="bg-yellow-500/20 text-yellow-600 px-2 py-1 rounded-full text-xs font-bold">
+                      TOP 10
+                    </div>
                   )}
                 </div>
               </div>
-              <div className="text-right">
-                <div
-                  className={`w-12 h-12 rounded-xl flex items-center justify-center mb-2 font-black text-lg ${getRankBadgeColor(
-                    currentUser.position
-                  )}`}
-                >
-                  {getRankIcon(currentUser.position) ||
-                    `#${currentUser.position}`}
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center ring-4 ring-purple-500/30">
+                      {currentUser.avatar_url ? (
+                        <img
+                          src={currentUser.avatar_url}
+                          alt={currentUser.username}
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-white font-bold text-xl">
+                          {currentUser.username.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    {/* Position indicator badge */}
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800">
+                      <span className="text-white text-xs font-bold">
+                        {currentUser.position <= 3 ? ["🥇","🥈","🥉"][currentUser.position - 1] : currentUser.position}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-bold text-foreground text-lg">
+                      {currentUser.username}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {currentUser.full_name}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {currentUser.rank_name && (
+                        <span
+                          className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border ${getTierBadgeColor(
+                            currentUser.rank_name
+                          )}`}
+                        >
+                          {currentUser.rank_name}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {currentUser.city || "Lokasi tidak diketahui"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-xl font-black text-purple-600">
-                  {currentUser.points}
-                </p>
-                <p className="text-xs text-muted-foreground">XP</p>
+                <div className="text-right">
+                  <div className="bg-purple-100 dark:bg-purple-900/30 px-3 py-2 rounded-lg mb-2">
+                    <p className="text-2xl font-black text-purple-600 dark:text-purple-400">
+                      {currentUser.points.toLocaleString("id-ID")}
+                    </p>
+                    <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold">XP</p>
+                  </div>
+                </div>
               </div>
+              
+              {/* Progress to next rank */}
+              {currentUser.position > 1 && (
+                <div className="mt-4 pt-4 border-t border-purple-500/20">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Target posisi #{currentUser.position - 1}</span>
+                    <span className="text-purple-600 font-semibold">
+                      {leaderboard[currentUser.position - 2]?.points 
+                        ? `${(leaderboard[currentUser.position - 2].points - currentUser.points).toLocaleString("id-ID")} XP lagi`
+                        : "Target tidak tersedia"
+                      }
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -791,17 +831,30 @@ const Leaderboard = () => {
               ref={
                 entry.user_id === currentUser?.user_id ? currentUserRef : null
               }
-              className={`bg-card/80 backdrop-blur-sm p-4 rounded-xl shadow-sm border border-border/50 hover:shadow-md transition-all ${
+              className={`bg-card/80 backdrop-blur-sm p-4 rounded-xl shadow-sm border hover:shadow-md transition-all ${
                 entry.user_id === currentUser?.user_id
-                  ? "ring-2 ring-purple-500"
-                  : ""
+                  ? "ring-2 ring-purple-500 bg-gradient-to-r from-purple-500/5 to-purple-600/5 border-purple-500/30"
+                  : "border-border/50"
               }`}
             >
+              {entry.user_id === currentUser?.user_id && (
+                <div className="absolute -top-2 -right-2 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-bold z-10">
+                  🎯 ANDA
+                </div>
+              )}
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center font-bold text-foreground">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold ${
+                  entry.user_id === currentUser?.user_id
+                    ? "bg-purple-500 text-white"
+                    : "bg-muted text-foreground"
+                }`}>
                   #{entry.position}
                 </div>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500/20 to-purple-700/20 flex items-center justify-center">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  entry.user_id === currentUser?.user_id
+                    ? "ring-2 ring-purple-500 bg-gradient-to-br from-purple-500 to-purple-700"
+                    : "bg-gradient-to-br from-purple-500/20 to-purple-700/20"
+                }`}>
                   {entry.avatar_url ? (
                     <img
                       src={entry.avatar_url}
@@ -809,7 +862,11 @@ const Leaderboard = () => {
                       className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
-                    <span className="text-purple-600 font-bold">
+                    <span className={`font-bold ${
+                      entry.user_id === currentUser?.user_id
+                        ? "text-white"
+                        : "text-purple-600"
+                    }`}>
                       {entry.username.charAt(0).toUpperCase()}
                     </span>
                   )}
@@ -828,20 +885,6 @@ const Leaderboard = () => {
                         {entry.rank_name}
                       </span>
                     )}
-                  </div>
-                  <div className="flex items-center gap-3 mt-1">
-                    <div className="flex items-center gap-1">
-                      <Recycle className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">
-                        {entry.total_bottles}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Weight className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">
-                        {entry.total_weight_kg}kg
-                      </span>
-                    </div>
                   </div>
                 </div>
                 <div className="text-right">
