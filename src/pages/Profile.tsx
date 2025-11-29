@@ -48,6 +48,7 @@ interface Profile {
   username: string;
   avatar_url: string | null;
   points: number;
+  username_last_updated: string | null;
 }
 
 interface VoucherRedemption {
@@ -90,8 +91,10 @@ const ProfilePage = () => {
     useState<VoucherRedemption | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [showUsernameDialog, setShowUsernameDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+  const [isUsernameLoading, setIsUsernameLoading] = useState(false);
   const { isDark, toggleDarkMode } = useDarkMode();
 
   // Password states
@@ -103,6 +106,9 @@ const ProfilePage = () => {
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Username states
+  const [newUsername, setNewUsername] = useState("");
 
   useEffect(() => {
     fetchProfile();
@@ -143,7 +149,7 @@ const ProfilePage = () => {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("full_name, username, avatar_url, points")
+        .select("full_name, username, avatar_url, points, username_last_updated")
         .eq("user_id", user.id)
         .single();
 
@@ -233,6 +239,140 @@ const ProfilePage = () => {
       setActivities(data || []);
     } catch (error: any) {
       toast.error("Gagal memuat riwayat");
+    }
+  };
+
+  const getUsernameCooldownStatus = () => {
+    if (!profile?.username_last_updated) return null; // First time change allowed
+    
+    const lastUpdated = new Date(profile.username_last_updated);
+    const now = new Date();
+    const daysDiff = Math.floor((now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysDiff < 7) {
+      const daysLeft = 7 - daysDiff;
+      return {
+        isOnCooldown: true,
+        daysLeft,
+        message: `Tunggu ${daysLeft} hari lagi`
+      };
+    }
+    
+    return { isOnCooldown: false };
+  };
+
+  const checkUsernameCooldown = () => {
+    if (!profile?.username_last_updated) return true; // First time change allowed
+    
+    const lastUpdated = new Date(profile.username_last_updated);
+    const now = new Date();
+    const daysDiff = Math.floor((now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysDiff < 7) {
+      const daysLeft = 7 - daysDiff;
+      toast.error(`Harus menunggu ${daysLeft} hari lagi untuk ganti username!`);
+      return false;
+    }
+    
+    return true;
+  };
+
+  const validateUsername = (username: string) => {
+    if (!username) {
+      toast.error("Username harus diisi!");
+      return false;
+    }
+    
+    if (username.length < 3) {
+      toast.error("Username minimal 3 karakter!");
+      return false;
+    }
+    
+    if (username.length > 20) {
+      toast.error("Username maksimal 20 karakter!");
+      return false;
+    }
+    
+    // Only allow letters, numbers, underscores, and dots
+    const usernameRegex = /^[a-zA-Z0-9_.]+$/;
+    if (!usernameRegex.test(username)) {
+      toast.error("Username hanya boleh mengandung huruf, angka, titik, dan underscore!");
+      return false;
+    }
+    
+    return true;
+  };
+
+  const handleUpdateUsername = async () => {
+    if (!validateUsername(newUsername)) return;
+    
+    // Check cooldown
+    if (!checkUsernameCooldown()) return;
+    
+    // Check if username is the same as current
+    if (profile?.username === newUsername) {
+      toast.error("Username sama dengan yang saat ini!");
+      return;
+    }
+    
+    setIsUsernameLoading(true);
+    
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Silakan login kembali");
+        return;
+      }
+      
+      // Check if username already exists
+      const { data: existingUser, error: checkError } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("username", newUsername)
+        .neq("user_id", user.id)
+        .single();
+      
+      if (checkError && checkError.code !== "PGRST116") {
+        throw checkError;
+      }
+      
+      if (existingUser) {
+        toast.error("Username sudah digunakan!");
+        return;
+      }
+      
+      // Update username with timestamp
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ 
+          username: newUsername,
+          username_last_updated: new Date().toISOString()
+        })
+        .eq("user_id", user.id);
+      
+      if (updateError) throw updateError;
+      
+      toast.success("Username berhasil diubah!");
+      
+      // Update local state
+      if (profile) {
+        setProfile({ 
+          ...profile, 
+          username: newUsername,
+          username_last_updated: new Date().toISOString()
+        });
+      }
+      
+      // Reset form
+      setNewUsername("");
+      setShowUsernameDialog(false);
+    } catch (error: any) {
+      console.error("Username update error:", error);
+      toast.error(error.message || "Gagal mengubah username");
+    } finally {
+      setIsUsernameLoading(false);
     }
   };
 
@@ -565,6 +705,97 @@ const ProfilePage = () => {
 
           {/* SETTINGS TAB */}
           <TabsContent value="settings" className="space-y-3 mt-4">
+            {/* ============================================ */}
+            {/* CHANGE USERNAME */}
+            {/* ============================================ */}
+            <Dialog
+              open={showUsernameDialog}
+              onOpenChange={setShowUsernameDialog}
+            >
+              <DialogTrigger asChild>
+                <div className="bg-card/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-border/50 cursor-pointer hover:border-primary/50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <User className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <span className="font-semibold text-foreground">
+                        Ganti Username
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {getUsernameCooldownStatus()?.isOnCooldown 
+                          ? getUsernameCooldownStatus()?.message
+                          : "Ubah username akun Anda"
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </DialogTrigger>
+              <DialogContent className="rounded-3xl sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Ganti Username</DialogTitle>
+                  <DialogDescription>
+                    Masukkan username baru Anda
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-username">Username Baru</Label>
+                    <Input
+                      id="new-username"
+                      type="text"
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      placeholder="Minimal 3 karakter, maksimal 20 karakter"
+                      className="rounded-xl"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Hanya huruf, angka, titik, dan underscore
+                    </p>
+                    {getUsernameCooldownStatus()?.isOnCooldown && (
+                      <div className="flex items-center gap-2 text-amber-600 text-sm bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>{getUsernameCooldownStatus()?.message} untuk ganti username</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <DialogFooter className="gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowUsernameDialog(false);
+                      setNewUsername("");
+                    }}
+                    disabled={isUsernameLoading}
+                    className="rounded-xl hover:bg-green-200 dark:hover:bg-green-800 hover:text-green-900 dark:hover:text-green-100"
+                  >
+                    Batal
+                  </Button>
+
+                  <Button
+                    onClick={handleUpdateUsername}
+                    disabled={isUsernameLoading || getUsernameCooldownStatus()?.isOnCooldown}
+                    className="rounded-xl font-semibold"
+                  >
+                    {isUsernameLoading ? (
+                      <span className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Memproses...
+                      </span>
+                    ) : getUsernameCooldownStatus()?.isOnCooldown ? (
+                      getUsernameCooldownStatus()?.message
+                    ) : (
+                      "Ubah Username"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
             {/* ============================================ */}
             {/* CHANGE PASSWORD - HANYA TAMPIL UNTUK USER EMAIL */}
             {/* ============================================ */}

@@ -49,3 +49,5 @@ FOR DELETE USING (
     AND ur.role = 'admin'
   )
 );
+
+ALTER TABLE profiles ADD COLUMN username_last_updated TIMESTAMP NULL;
