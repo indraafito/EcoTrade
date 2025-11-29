@@ -17,6 +17,7 @@ import {
   Gift,
   Zap,
   Gem,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -76,15 +77,25 @@ const Leaderboard = () => {
   const [showPastWinners, setShowPastWinners] = useState(false);
   const [showRankingTiers, setShowRankingTiers] = useState(false);
   const [achievedBadges, setAchievedBadges] = useState<AchievedBadge[]>([]);
+  const [daysUntilReset, setDaysUntilReset] = useState<number>(0);
 
   // Ref untuk scroll ke posisi user
   const currentUserRef = useRef<HTMLDivElement>(null);
+
+  // Calculate days until reset
+  const calculateDaysUntilReset = () => {
+    const now = new Date();
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const daysLeft = Math.ceil((endOfMonth.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return daysLeft;
+  };
 
   useEffect(() => {
     fetchLeaderboard();
     fetchRankingTiers();
     fetchPastWinners();
     fetchAchievedBadges();
+    setDaysUntilReset(calculateDaysUntilReset());
   }, []);
 
   useEffect(() => {
@@ -396,9 +407,15 @@ const Leaderboard = () => {
                 Kompetisi {getCurrentMonth()}
               </p>
             </div>
-            <p className="text-white/80 text-sm">
+            <p className="text-white/80 text-sm mb-2">
               Berdasarkan XP bulan ini • Reset awal bulan
             </p>
+            <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20">
+              <Clock className="w-4 h-4 text-white/80" />
+              <p className="text-white text-sm font-semibold">
+                {daysUntilReset} hari lagi
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -527,6 +544,19 @@ const Leaderboard = () => {
                   </div>
                 </div>
               )}
+              
+              {/* Reset Countdown */}
+              <div className="mt-4 pt-4 border-t border-purple-500/20">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-purple-600" />
+                    <span className="text-muted-foreground">Reset bulanan</span>
+                  </div>
+                  <span className="text-purple-600 font-semibold">
+                    {daysUntilReset} hari lagi
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
