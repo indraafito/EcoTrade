@@ -1,5 +1,8 @@
 # EcoTrade - Aplikasi Daur Ulang Botol
 
+**Version:** 1.0.0  
+**License:** MIT
+
 ## 🌱 Tentang EcoTrade
 
 EcoTrade adalah aplikasi mobile-first untuk mendukung program daur ulang botol plastik. Pengguna dapat memindai QR code di lokasi penimbunan, mengumpulkan poin, dan menukarkannya dengan voucher menarik.
@@ -178,8 +181,8 @@ Untuk issues atau questions:
 
 ## 📄 License
 
-Project ini dilisensikan under MIT License.
+Project ini dilisensikan under [MIT License](LICENSE).
 
 ---
 
-**EcoTrade** - Membangun masa depan yang lebih hijau melalui teknologi daur ulang. 🌱♻️
+**EcoTrade v1.0.0** - Membangun masa depan yang lebih hijau melalui teknologi daur ulang. 🌱♻️
